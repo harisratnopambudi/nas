@@ -389,6 +389,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>
         Download
       </button>
+      <button class="tbtn" id="shareBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5l6.8-3.9M8.6 13.5l6.8 3.9"/></svg>
+        Share
+      </button>
       <button class="tbtn" id="deleteBtn" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
         Delete
@@ -673,6 +677,16 @@ function tgUrl(method){ return `https://api.telegram.org/bot${CONFIG.botToken}/$
 
 async function tgCall(method, params={}){
   const data = await tgFetchJson(tgUrl(method), {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(params)
+  });
+  return data.result;
+}
+
+// Sama seperti tgCall, tapi pakai token spesifik (dipakai halaman share publik yang belum punya CONFIG)
+async function tgCallWithToken(token, method, params={}){
+  const data = await tgFetchJson(`https://api.telegram.org/bot${token}/${method}`, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(params)
@@ -1192,6 +1206,7 @@ function updateToolbarState(){
   const singleFile = getSelectedFiles().length === 1 && getSelectedFolders().length === 0;
   const anySelected = n > 0;
   $('#downloadBtn').disabled = getSelectedFiles().length === 0;
+  $('#shareBtn').disabled = !singleFile || !sb || currentView === 'trash';
   $('#deleteBtn').disabled = !anySelected;
   $('#renameBtn').disabled = n !== 1;
   $('#moveBtn').disabled = !anySelected || currentView === 'trash';
@@ -1344,6 +1359,32 @@ async function downloadSelected(){
   for(const f of files) await downloadFile(f.id);
 }
 
+async function shareFile(fileId){
+  const f = FILES.find(x=>x.id===fileId);
+  if(!f) return;
+  if(!sb){ toast('Fitur share butuh Cloud (Supabase) aktif dulu', 'err'); return; }
+  try{
+    const { data, error } = await sb.from('td_shares').insert({
+      tg_file_id: f.tgFileId,
+      file_name: f.name,
+      mime_type: f.mime || null,
+      size: f.size || null
+    }).select('id').single();
+    if(error) throw new Error(error.message);
+    const url = `${location.origin}${location.pathname}?share=${data.id}`;
+    try{
+      await navigator.clipboard.writeText(url);
+      toast('Link share disalin ke clipboard', 'ok');
+    }catch(_e){
+      prompt('Salin link ini secara manual:', url);
+    }
+    logActivity(`Share link dibuat: ${f.name}`, 'ok');
+  }catch(e){
+    toast('Gagal bikin link share: ' + e.message, 'err');
+    logActivity('Gagal bikin share link: ' + e.message, 'err');
+  }
+}
+
 async function previewFile(fileId){
   const f = FILES.find(x=>x.id===fileId);
   if(!f) return;
@@ -1358,6 +1399,7 @@ async function previewFile(fileId){
           <div class="pmeta">${fmtSize(f.size)} · ${fmtDate(f.ts)}</div>
         </div>
         <div class="preview-head-actions">
+          <div class="icon-btn" id="previewShareBtn" title="Bagikan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5l6.8-3.9M8.6 13.5l6.8 3.9"/></svg></div>
           <div class="icon-btn" id="previewDlBtn" title="Unduh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></div>
           <div class="icon-btn" id="closePreview" title="Tutup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
         </div>
@@ -1371,6 +1413,7 @@ async function previewFile(fileId){
   overlay.addEventListener('click', (e)=>{ if(e.target === overlay) overlay.remove(); });
   overlay.querySelector('#closePreview').onclick = () => overlay.remove();
   overlay.querySelector('#previewDlBtn').onclick = () => downloadFile(f.id);
+  overlay.querySelector('#previewShareBtn').onclick = () => shareFile(f.id);
 
   const body = overlay.querySelector('#previewBody');
   try{
@@ -1769,6 +1812,10 @@ function bindEvents(){
   $$('.nav-item[data-view]').forEach(el => el.addEventListener('click', () => setView(el.dataset.view)));
 
   $('#downloadBtn').addEventListener('click', downloadSelected);
+  $('#shareBtn').addEventListener('click', () => {
+    const f = getSelectedFiles()[0];
+    if(f) shareFile(f.id);
+  });
   $('#deleteBtn').addEventListener('click', deleteSelected);
   $('#renameBtn').addEventListener('click', renameSelected);
   $('#moveBtn').addEventListener('click', showMoveModal);
@@ -1850,7 +1897,50 @@ function selectAllVisible(){
   renderTable();
 }
 
+async function renderSharePage(shareId){
+  document.title = 'Unduh File — Haris DevLab NAS';
+  document.body.innerHTML = `
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f1115;padding:20px;font-family:inherit;">
+      <div id="shareCard" style="max-width:420px;width:100%;background:#181b22;border:1px solid #262a33;border-radius:16px;padding:32px;text-align:center;color:#e8eaed;">
+        <div class="spin" style="margin:0 auto;"></div>
+        <div style="margin-top:14px;color:#9aa4b2;font-size:14px;">Memuat info file…</div>
+      </div>
+    </div>
+  `;
+  const card = document.getElementById('shareCard');
+  try{
+    if(!sb) throw new Error('Konfigurasi cloud belum aktif di halaman ini.');
+    const { data, error } = await sb.from('td_shares').select('*').eq('id', shareId).maybeSingle();
+    if(error) throw new Error(error.message);
+    if(!data) throw new Error('Link share tidak ditemukan atau sudah dihapus.');
+    const fileInfo = await tgCallWithToken(DEFAULT_BOT_TOKEN, 'getFile', { file_id: data.tg_file_id });
+    const downloadUrl = `https://api.telegram.org/file/bot${DEFAULT_BOT_TOKEN}/${fileInfo.file_path}`;
+    const kind = kindFromMime(data.mime_type || '', data.file_name || '');
+    const previewHtml = kind === 'image'
+      ? `<img src="${downloadUrl}" style="max-width:100%;border-radius:10px;margin-bottom:16px;">`
+      : '';
+    card.innerHTML = `
+      ${previewHtml}
+      <div style="font-size:17px;font-weight:600;word-break:break-word;margin-bottom:4px;">${escapeHtml(data.file_name)}</div>
+      <div style="color:#9aa4b2;font-size:13px;margin-bottom:20px;">${fmtSize(data.size || 0)}</div>
+      <a href="${downloadUrl}" download="${escapeHtml(data.file_name)}" target="_blank"
+         style="display:inline-block;padding:12px 28px;background:#4f8cff;color:#fff;border-radius:10px;text-decoration:none;font-weight:600;">Download</a>
+      <div style="margin-top:18px;font-size:12px;color:#5b6472;">Dibagikan lewat Haris DevLab NAS</div>
+    `;
+  }catch(e){
+    card.innerHTML = `
+      <div style="color:#ff6b6b;font-weight:600;">Gagal memuat file</div>
+      <div style="color:#9aa4b2;font-size:13px;margin-top:8px;">${escapeHtml(e.message)}</div>
+    `;
+  }
+}
+
 async function init(){
+  const shareId = new URLSearchParams(location.search).get('share');
+  if(shareId){
+    await renderSharePage(shareId);
+    return;
+  }
   logActivity('Auto login...', 'info');
   await loadAll();
   applyTheme();
