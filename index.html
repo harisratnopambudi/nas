@@ -356,7 +356,7 @@
     <div class="storage-box">
       <div class="sb-top">
         <span class="sb-used" id="storageUsed">0 B</span>
-        <span class="sb-max" id="storageMax">/ 100 TB</span>
+        <span class="sb-max" id="storageMax">/ 1000 TB</span>
       </div>
       <div class="sb-track"><div class="sb-fill" id="storageFill" style="width:0%"></div></div>
       <div class="sb-pct" id="storagePct">0% terpakai</div>
@@ -1287,7 +1287,7 @@ function updateStatusBarCounts(itemCount){
   $('#sbSelected').textContent = `${SELECTED.size} selected`;
 }
 
-const STORAGE_MAX_BYTES = 100 * 1024 * 1024 * 1024 * 1024; // 100 TB
+const STORAGE_MAX_BYTES = 1000 * 1024 * 1024 * 1024 * 1024; // 1000 TB
 const STORAGE_CATEGORIES = {
   image:    { label: 'Gambar',  color: '#22c55e' },
   video:    { label: 'Video',   color: '#f97316' },
