@@ -1,0 +1,1850 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Haris DevLab-NAS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0B1420;
+    --sidebar: #0F1B2C;
+    --panel: #101C2C;
+    --panel-2: #16243A;
+    --row-hover: #16243A;
+    --row-sel: rgba(58,141,255,0.16);
+    --border: #1E2E45;
+    --text: #E7ECF3;
+    --muted: #7288A2;
+    --muted-2: #52667F;
+    --accent: #3A8DFF;
+    --accent-2: #2E72D6;
+    --accent-soft: rgba(58,141,255,0.14);
+    --danger: #F0554D;
+    --ok: #37C87A;
+    --warn: #E8B34A;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+  body.theme-light{
+    --bg: #F4F6F9;
+    --sidebar: #FFFFFF;
+    --panel: #FFFFFF;
+    --panel-2: #EEF1F6;
+    --row-hover: #F0F3F8;
+    --row-sel: rgba(58,141,255,0.12);
+    --border: #E1E6EE;
+    --text: #1B2430;
+    --muted: #5E6E82;
+    --muted-2: #8A97A8;
+    --accent: #2E72D6;
+    --accent-2: #1F5CB8;
+    --accent-soft: rgba(46,114,214,0.12);
+    --danger: #D9463D;
+    --ok: #1F9D5C;
+    --warn: #B87A16;
+  }
+  body.theme-light ::-webkit-scrollbar-thumb{ background:#C7D0DD; }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--text); font-family:var(--sans);
+    display:flex; flex-direction:column; height:100vh; overflow:hidden; font-size:13px;
+  }
+  ::-webkit-scrollbar{width:8px; height:8px;}
+  ::-webkit-scrollbar-thumb{background:#243755; border-radius:4px;}
+  ::selection{ background: var(--accent-soft); }
+  button{ font-family:var(--sans); }
+
+  /* ===== Title bar ===== */
+  .titlebar{
+    height:38px; min-height:38px; background:#08111D; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between; padding:0 6px 0 12px; -webkit-app-region:drag;
+  }
+  .tb-left{ display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12.5px; }
+  .tb-left .tmark{ width:18px; height:18px; border-radius:5px; background:linear-gradient(145deg,var(--accent),var(--accent-2)); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .tb-left .tmark svg{ width:11px; height:11px; }
+  .tb-right{ display:flex; align-items:center; gap:2px; -webkit-app-region:no-drag; }
+  .tb-btn{
+    width:40px; height:38px; background:transparent; border:none; color:var(--muted); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition: background .1s;
+  }
+  .tb-btn:hover{ background:var(--panel-2); color:var(--text); }
+  .tb-btn.close:hover{ background:var(--danger); color:#fff; }
+  .tb-btn svg{ width:11px; height:11px; }
+
+  /* ===== App shell ===== */
+  .app{ flex:1; display:flex; min-height:0; }
+
+  /* ===== Sidebar ===== */
+  .sidebar{
+    width:230px; min-width:230px; background:var(--sidebar); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; padding:18px 12px; overflow-y:auto;
+  }
+  .brand{ padding: 0 4px 18px; }
+  .brand .t1{ font-weight:700; font-size:15.5px; letter-spacing:0.2px; }
+  .brand .t2{ font-size:10.5px; color:var(--muted-2); font-family:var(--mono); margin-top:2px; }
+
+  .sec-label{ font-size:10px; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted-2); padding:4px 8px 6px; margin-top:10px; }
+  .status-row{ display:flex; align-items:center; gap:7px; padding:2px 8px 4px; font-size:12px; }
+  .status-dot{ width:7px; height:7px; border-radius:50%; background:var(--muted-2); flex-shrink:0; }
+  .status-dot.on{ background:var(--ok); box-shadow:0 0 6px rgba(55,200,122,0.7); }
+  .status-dot.off{ background:var(--danger); }
+  .status-row .stext{ color:var(--muted); }
+  .status-row .stext.on{ color:var(--ok); }
+
+  .storage-box{ padding:10px 8px 4px; }
+  .storage-box .sb-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+  .storage-box .sb-used{ font-size:12.5px; font-weight:600; color:var(--text); }
+  .storage-box .sb-max{ font-size:10.5px; color:var(--muted-2); font-family:var(--mono); }
+  .storage-box .sb-track{ width:100%; height:6px; border-radius:4px; background:var(--panel-2); overflow:hidden; border:1px solid var(--border); }
+  .storage-box .sb-fill{ height:100%; border-radius:4px; background:linear-gradient(90deg,#3b82f6,#22d3ee); transition:width .3s ease; }
+  .storage-box .sb-pct{ font-size:10px; color:var(--muted-2); margin-top:5px; font-family:var(--mono); }
+
+  .sb-stack{ width:100%; height:6px; border-radius:4px; overflow:hidden; display:flex; margin-top:10px; background:var(--panel-2); border:1px solid var(--border); }
+  .sb-stack .seg{ height:100%; transition:width .3s ease; }
+  .sb-legend{ margin-top:8px; display:flex; flex-direction:column; gap:5px; }
+  .sb-legend-item{ display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--muted); }
+  .sb-legend-item .sb-dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .sb-legend-item .sb-lname{ flex:1; }
+  .sb-legend-item .sb-lsize{ color:var(--muted-2); font-family:var(--mono); font-size:10px; }
+
+  .nav-item{
+    display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:7px; cursor:pointer;
+    font-size:12.8px; color:var(--text); user-select:none; transition: background .1s;
+  }
+  .nav-item:hover{ background:var(--panel-2); }
+  .nav-item.active{ background:var(--accent-soft); color:var(--accent); }
+  .nav-item .ico{ width:14.5px; height:14.5px; flex-shrink:0; opacity:0.85; }
+  .nav-item .count{ margin-left:auto; font-size:10.5px; color:var(--muted-2); font-family:var(--mono); }
+  .nav-item.active .count{ color:var(--accent); }
+
+  .folder-row{ display:flex; align-items:center; gap:2px; }
+  .folder-row .nav-item{ flex:1; min-width:0; }
+  .folder-row .nav-item span.label{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .folder-toggle{ width:14px; height:20px; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:var(--muted-2); cursor:pointer; }
+  .folder-toggle svg{ width:9px; height:9px; transition: transform .12s ease; }
+  .folder-toggle.expanded svg{ transform: rotate(90deg); }
+  .folder-toggle.spacer{ cursor:default; }
+  .folder-add{ opacity:0; width:20px; height:20px; border-radius:5px; display:flex; align-items:center; justify-content:center; color:var(--muted-2); cursor:pointer; flex-shrink:0; }
+  .folder-row:hover .folder-add{ opacity:1; }
+  .folder-add:hover{ background:var(--accent-soft); color:var(--accent); }
+  .folder-add svg{ width:11px; height:11px; }
+  .folder-del{ opacity:0; width:20px; height:20px; border-radius:5px; display:flex; align-items:center; justify-content:center; color:var(--muted-2); cursor:pointer; flex-shrink:0; }
+  .folder-row:hover .folder-del{ opacity:1; }
+  .folder-del:hover{ background:rgba(240,85,77,0.15); color:var(--danger); }
+  .folder-del svg{ width:11px; height:11px; }
+
+  .add-folder-btn{
+    display:flex; align-items:center; gap:7px; padding:7px 8px; margin-top:4px; border-radius:7px;
+    color:var(--muted); font-size:12px; cursor:pointer; border:1px dashed var(--border);
+  }
+  .add-folder-btn:hover{ color:var(--accent); border-color:var(--accent); }
+
+  .pill-row{ display:flex; gap:5px; flex-wrap:wrap; padding:2px 4px; }
+  .pill{ padding:4px 9px; border-radius:6px; font-size:11px; border:1px solid var(--border); color:var(--muted); cursor:pointer; background:transparent; }
+  .pill.active{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
+
+  .sidebar-bottom{ margin-top:auto; padding-top:10px; }
+  .sb-link{ padding:7px 8px; font-size:12px; color:var(--muted); cursor:pointer; border-radius:7px; }
+  .sb-link:hover{ background:var(--panel-2); color:var(--text); }
+
+  /* ===== Main ===== */
+  .main{ flex:1; display:flex; flex-direction:column; min-width:0; }
+
+  .toolbar{
+    display:flex; align-items:center; gap:4px; padding:8px 12px; border-bottom:1px solid var(--border);
+    flex-wrap:wrap; background:var(--panel);
+  }
+  .tbtn{
+    display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:7px; border:1px solid transparent;
+    background:transparent; color:var(--text); font-size:12.2px; cursor:pointer; white-space:nowrap;
+  }
+  .tbtn:hover{ background:var(--panel-2); border-color:var(--border); }
+  .tbtn:disabled{ opacity:0.35; cursor:not-allowed; }
+  .tbtn:disabled:hover{ background:transparent; border-color:transparent; }
+  .tbtn svg{ width:13px; height:13px; flex-shrink:0; }
+  .tbtn.primary{ background:var(--accent-soft); color:var(--accent); }
+  .tb-sep{ width:1px; height:20px; background:var(--border); margin:0 4px; flex-shrink:0; }
+  .tb-spacer{ flex:1; }
+  .tb-search{
+    display:flex; align-items:center; gap:6px; background:var(--bg); border:1px solid var(--border); border-radius:7px;
+    padding:5px 10px; width:170px; flex-shrink:0;
+  }
+  .tb-search svg{ width:12px; height:12px; color:var(--muted-2); flex-shrink:0; }
+  .tb-search input{ background:transparent; border:none; outline:none; color:var(--text); font-size:12px; width:100%; font-family:var(--sans); }
+  .tb-select{
+    background:var(--bg); border:1px solid var(--border); border-radius:7px; color:var(--text); font-size:12px;
+    padding:6px 8px; outline:none; font-family:var(--sans); flex-shrink:0;
+  }
+  .tb-sort-dir{
+    background:var(--bg); border:1px solid var(--border); border-radius:7px; color:var(--muted); font-size:11px;
+    padding:6px 9px; cursor:pointer; font-family:var(--mono); flex-shrink:0;
+  }
+  .tb-sort-dir:hover{ color:var(--text); }
+
+  .table-wrap{ flex:1; overflow:auto; position:relative; }
+  table{ width:100%; border-collapse:collapse; }
+  thead th{
+    position:sticky; top:0; background:var(--panel); text-align:left; font-size:10.5px; text-transform:uppercase;
+    letter-spacing:0.8px; color:var(--muted-2); padding:9px 14px; border-bottom:1px solid var(--border); cursor:pointer;
+    user-select:none; white-space:nowrap; z-index:1;
+  }
+  thead th:hover{ color:var(--muted); }
+  thead th.active-sort{ color:var(--accent); }
+  tbody tr{ cursor:pointer; border-bottom:1px solid var(--border); transition: background .06s; }
+  tbody tr:hover{ background:var(--row-hover); }
+  tbody tr.selected{ background:var(--row-sel); }
+  tbody td{ padding:8px 14px; font-size:12.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px; }
+  tbody td.col-name{ display:flex; align-items:center; gap:9px; max-width:340px; }
+  tbody td.col-name svg{ width:15px; height:15px; flex-shrink:0; }
+  tbody td.muted{ color:var(--muted); font-family:var(--mono); font-size:11.5px; }
+  .fav-star{ color:var(--warn); margin-right:4px; }
+  .status-tag{ font-size:10.5px; padding:2px 7px; border-radius:5px; background:var(--panel-2); color:var(--muted); font-family:var(--mono); }
+  .status-tag.ok{ background:rgba(55,200,122,0.12); color:var(--ok); }
+  .status-tag.trash{ background:rgba(240,85,77,0.12); color:var(--danger); }
+
+  .empty-row td{ text-align:center; color:var(--muted-2); padding:60px 14px; font-size:12.5px; }
+
+  /* ===== Activity log ===== */
+  .activity{
+    height:150px; min-height:34px; border-top:1px solid var(--border); background:var(--panel); display:flex; flex-direction:column;
+    transition: height .15s ease;
+  }
+  .activity.collapsed{ height:34px; }
+  .activity-head{ display:flex; align-items:center; justify-content:space-between; padding:7px 12px; border-bottom:1px solid var(--border); flex-shrink:0; }
+  .activity-head .ah-title{ font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); font-weight:600; }
+  .activity-head .ah-actions{ display:flex; gap:6px; align-items:center; }
+  .ah-btn{ background:transparent; border:none; color:var(--muted-2); font-size:11px; cursor:pointer; padding:3px 7px; border-radius:5px; }
+  .ah-btn:hover{ background:var(--panel-2); color:var(--text); }
+  .activity-body{ flex:1; overflow-y:auto; padding:6px 12px; font-family:var(--mono); font-size:11.3px; line-height:1.9; }
+  .log-line{ color:var(--muted); }
+  .log-line .lt{ color:var(--muted-2); margin-right:8px; }
+  .log-line.ok{ color:var(--ok); }
+  .log-line.err{ color:var(--danger); }
+  .log-line.warn{ color:var(--warn); }
+
+  /* ===== Status bar ===== */
+  .statusbar{
+    height:26px; min-height:26px; border-top:1px solid var(--border); background:#08111D; display:flex; align-items:center;
+    padding:0 12px; gap:14px; font-size:11px; color:var(--muted-2);
+  }
+  .statusbar .sb-sep{ width:1px; height:12px; background:var(--border); }
+  .statusbar .sb-connected{ color:var(--ok); }
+  .statusbar .sb-disconnected{ color:var(--danger); }
+  .statusbar .sb-spacer{ flex:1; }
+
+  /* ===== Modal (reused) ===== */
+  .overlay{ position:fixed; inset:0; background:rgba(4,8,14,0.68); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px; }
+  .modal{ background:var(--panel); border:1px solid var(--border); border-radius:12px; width:100%; max-width:440px; padding:24px; max-height:88vh; overflow-y:auto; }
+  .modal h2{ font-size:15.5px; margin:0 0 6px; }
+  .modal .desc{ font-size:12px; color:var(--muted); line-height:1.6; margin-bottom:16px; }
+  .field{ margin-bottom:12px; }
+  .field label{ font-size:10.5px; color:var(--muted); display:block; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px; }
+  .field input, .field select{ width:100%; background:var(--bg); border:1px solid var(--border); border-radius:7px; padding:9px 11px; color:var(--text); font-size:12.5px; outline:none; font-family:var(--mono); }
+  .field input:focus, .field select:focus{ border-color:var(--accent); }
+  .step{ display:flex; gap:9px; padding:11px; background:var(--bg); border-radius:8px; margin-bottom:10px; border:1px solid var(--border); }
+  .step .num{ width:19px; height:19px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:10.5px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-family:var(--mono); }
+  .step .txt{ font-size:11.5px; color:var(--muted); line-height:1.6; }
+  .step .txt b{ color:var(--text); font-weight:600; }
+  .modal-actions{ display:flex; gap:8px; margin-top:16px; justify-content:flex-end; }
+  .btn{ display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:8px; border:none; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .btn-primary{ background:linear-gradient(145deg,var(--accent),var(--accent-2)); color:#fff; }
+  .btn-ghost{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); }
+  .status-line{ font-size:11.5px; margin-top:10px; padding:8px 10px; border-radius:7px; display:none; }
+  .status-line.show{ display:block; }
+  .status-line.ok{ background:rgba(55,200,122,0.12); color:var(--ok); }
+  .status-line.err{ background:rgba(240,85,77,0.12); color:var(--danger); }
+
+  .preview-modal{ background:var(--panel); border:1px solid var(--border); border-radius:12px; width:100%; max-width:720px; max-height:88vh; overflow:hidden; display:flex; flex-direction:column; }
+  .preview-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+  .preview-head .pname{ font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .preview-head .pmeta{ font-size:11px; color:var(--muted); font-family:var(--mono); margin-top:2px; }
+  .preview-head-actions{ display:flex; gap:6px; flex-shrink:0; }
+  .preview-body{ flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; background:var(--bg); padding:18px; min-height:200px; }
+  .preview-body img{ max-width:100%; max-height:70vh; border-radius:8px; }
+  .preview-body video{ max-width:100%; max-height:70vh; border-radius:8px; }
+  .preview-body audio{ width:100%; }
+  .preview-body iframe{ width:100%; height:70vh; border:none; border-radius:8px; background:#fff; }
+  .preview-fallback{ text-align:center; color:var(--muted); font-size:12px; padding:30px; }
+  .preview-loading{ color:var(--muted); font-size:12px; display:flex; align-items:center; gap:8px; }
+  .spin{ width:15px; height:15px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .icon-btn{ width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center; background:transparent; border:1px solid var(--border); color:var(--muted); cursor:pointer; }
+  .icon-btn:hover{ color:var(--text); background:var(--panel-2); }
+  .icon-btn svg{ width:13px; height:13px; }
+
+  #toast-host{ position:fixed; bottom:34px; right:16px; z-index:200; display:flex; flex-direction:column; gap:8px; }
+  .toast{ background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:10px 15px; border-radius:8px; font-size:12px; box-shadow:0 8px 24px rgba(0,0,0,0.4); max-width:300px; }
+  .toast.ok{ border-color:rgba(55,200,122,0.4); }
+  .toast.err{ border-color:rgba(240,85,77,0.4); }
+
+  .progress-wrap{ position:fixed; top:38px; left:0; right:0; height:2px; background:transparent; z-index:300; }
+  .progress-bar{ height:100%; background:var(--accent); width:0%; transition: width .2s ease; }
+
+  .folder-picker-tree .nav-item{ cursor:pointer; }
+  .folder-picker-tree .nav-item.picked{ background:var(--accent-soft); color:var(--accent); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+
+<div class="titlebar">
+  <div class="tb-left">
+    <div class="tmark"><svg viewBox="0 0 24 24" fill="none"><path d="M6.5 18.5a4.2 4.2 0 0 1-.6-8.36 5.5 5.5 0 0 1 10.72-2.1 4.6 4.6 0 0 1 4.63 4.6 4.4 4.4 0 0 1-1.15 8.66h-13.6z" fill="white"/></svg></div>
+    <span>Haris DevLab-NAS v1.0</span>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="t1">Haris DevLab-NAS</div>
+      <div class="t2">Private Network Storage</div>
+    </div>
+
+    <div class="sec-label">Status</div>
+    <div class="status-row">
+      <div class="status-dot" id="statusDot"></div>
+      <span class="stext" id="statusText">Menghubungkan…</span>
+    </div>
+
+    <div class="sec-label">Menu</div>
+    <div class="nav-item active" data-view="all">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      <span>Semua File</span><span class="count" id="countAll">0</span>
+    </div>
+    <div class="nav-item" data-view="inbox">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h4l2 3h4l2-3h4"/><path d="M4 12l1.5-7A2 2 0 0 1 7.4 3.5h9.2a2 2 0 0 1 1.9 1.5L20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6z"/></svg>
+      <span>Pesan Tersimpan</span><span class="count" id="countInbox">0</span>
+    </div>
+    <div class="nav-item" data-view="favorites">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3.1 6.7 7.4.9-5.4 5 1.5 7.3L12 18.6 5.4 21.9l1.5-7.3-5.4-5 7.4-.9z"/></svg>
+      <span>Favorit</span><span class="count" id="countFav">0</span>
+    </div>
+    <div class="nav-item" data-view="trash">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
+      <span>Sampah</span><span class="count" id="countTrash">0</span>
+    </div>
+
+    <div class="sec-label">Folder Saya</div>
+    <div id="folderList"></div>
+    <div class="add-folder-btn" id="addFolderBtn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Folder Baru
+    </div>
+
+    <div class="sec-label">Item Per Halaman</div>
+    <div class="pill-row" id="pageSizeRow">
+      <button class="pill" data-size="30">30</button>
+      <button class="pill active" data-size="50">50</button>
+      <button class="pill" data-size="100">100</button>
+      <button class="pill" data-size="200">200</button>
+    </div>
+
+    <div class="sec-label">Tema</div>
+    <div class="pill-row" id="themeRow">
+      <button class="pill" data-theme="light">Light</button>
+      <button class="pill active" data-theme="dark">Dark</button>
+      <button class="pill" data-theme="system">System</button>
+    </div>
+
+    <div class="sec-label">Storage</div>
+    <div class="storage-box">
+      <div class="sb-top">
+        <span class="sb-used" id="storageUsed">0 B</span>
+        <span class="sb-max" id="storageMax">/ 100 TB</span>
+      </div>
+      <div class="sb-track"><div class="sb-fill" id="storageFill" style="width:0%"></div></div>
+      <div class="sb-pct" id="storagePct">0% terpakai</div>
+      <div class="sb-stack" id="storageStack"></div>
+      <div class="sb-legend" id="storageLegend"></div>
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="sb-link" id="settingsBtn">Pengaturan Bot</div>
+      <div class="sb-link" id="aboutBtn">Tentang</div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="toolbar">
+      <button class="tbtn primary" id="uploadFileBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+        Upload File
+      </button>
+      <button class="tbtn" id="uploadFolderBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg>
+        Upload Folder
+      </button>
+      <button class="tbtn" id="refreshBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"/></svg>
+        Refresh
+      </button>
+      <div class="tb-sep"></div>
+      <button class="tbtn" id="downloadBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>
+        Download
+      </button>
+      <button class="tbtn" id="deleteBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
+        Delete
+      </button>
+      <button class="tbtn" id="renameBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+        Rename
+      </button>
+      <button class="tbtn" id="moveBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/><path d="M13 3h8v8M21 3l-9 9"/></svg>
+        Move
+      </button>
+      <button class="tbtn" id="copyBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy
+      </button>
+      <button class="tbtn" id="favBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.1 6.7 7.4.9-5.4 5 1.5 7.3L12 18.6 5.4 21.9l1.5-7.3-5.4-5 7.4-.9z"/></svg>
+        Favorite
+      </button>
+      <button class="tbtn" id="propsBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        Properties
+      </button>
+      <div class="tb-spacer"></div>
+      <div class="tb-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="searchInput" placeholder="Cari file...">
+      </div>
+      <select class="tb-select" id="filterSelect">
+        <option value="all">All</option>
+        <option value="image">Gambar</option>
+        <option value="video">Video</option>
+        <option value="audio">Audio</option>
+        <option value="document">Dokumen</option>
+        <option value="other">Lainnya</option>
+      </select>
+      <select class="tb-select" id="sortSelect">
+        <option value="name">Name</option>
+        <option value="ts">Date</option>
+        <option value="size">Size</option>
+      </select>
+      <button class="tb-sort-dir" id="sortDirBtn">ASC</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:26px;"></th>
+            <th data-sort="name">Name</th>
+            <th>Folder</th>
+            <th data-sort="ts">Date Uploaded</th>
+            <th data-sort="size">Size</th>
+            <th>Type</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="activity" id="activityPanel">
+      <div class="activity-head">
+        <span class="ah-title">Activity Log</span>
+        <div class="ah-actions">
+          <button class="ah-btn" id="clearLogBtn">Clear</button>
+          <button class="ah-btn" id="toggleLogBtn">Collapse</button>
+        </div>
+      </div>
+      <div class="activity-body" id="activityBody"></div>
+    </div>
+
+    <div class="statusbar">
+      <span id="sbItems">0 items</span>
+      <div class="sb-sep"></div>
+      <span id="sbSelected">0 selected</span>
+      <div class="sb-spacer"></div>
+      <span id="sbConn">Menghubungkan…</span>
+    </div>
+
+    <input type="file" id="fileInput" multiple style="display:none">
+    <input type="file" id="folderInput" multiple webkitdirectory style="display:none">
+  </div>
+</div>
+
+<div id="toast-host"></div>
+
+<script>
+// ============ State ============
+const DEFAULT_BOT_TOKEN = '8557992636:AAHgYJlq9sSDdrDF3yKDYXSWWRFRfvd5JwU';
+const DEFAULT_CHAT_ID = 1941925204;
+const DEFAULT_BOT_USERNAME = 'HarisDrive_Bot';
+
+// ============ Supabase (index lintas-device) ============
+// Isi 2 baris ini dengan Project URL & anon key dari Supabase Dashboard > Settings > API.
+// Selama masih kosong, aplikasi otomatis fallback ke cara lama (index via pinned message Telegram).
+const SUPABASE_URL = 'https://jynyxjanuxbaspvfgugu.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5bnl4amFudXhiYXNwdmZndWd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwODM4ODIsImV4cCI6MjA5ODY1OTg4Mn0.On_GY4DexVnLR1xNrOkYz8JFCtZufSD4gk6zKhbcB6I';
+const sb = (() => {
+  if(SUPABASE_URL.includes('xxxx') || SUPABASE_ANON_KEY.includes('PASTE')) return null;
+  try{
+    if(!window.supabase || typeof window.supabase.createClient !== 'function'){
+      console.error('Supabase JS gagal dimuat dari CDN (window.supabase tidak ada). Cek koneksi internet / ad-blocker / firewall yang mungkin blokir cdn.jsdelivr.net.');
+      return null;
+    }
+    return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }catch(e){
+    console.error('Gagal init Cloud client:', e);
+    return null;
+  }
+})();
+let realtimeChannel = null;
+
+let CONFIG = null;
+let FOLDERS = [];  // {id, name, parentId}
+let FILES = [];    // {id, name, folderId, tgFileId, tgMessageId, size, mime, kind, ts, favorite, trashed}
+let EXPANDED = new Set();
+let currentView = 'all'; // 'all' | 'inbox' | 'favorites' | 'trash' | folderId
+let updateOffset = 0;
+let SELECTED = new Set(); // "f_<id>" file, "d_<id>" folder
+let LOG = [];
+let sortKey = 'name';
+let sortDir = 'asc';
+let filterKind = 'all';
+let pageSize = 50;
+let theme = 'dark'; // 'light' | 'dark' | 'system'
+
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+function applyTheme(){
+  const resolved = theme === 'system'
+    ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+    : theme;
+  document.body.classList.toggle('theme-light', resolved === 'light');
+}
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+function toast(msg, type='ok'){
+  const host = $('#toast-host');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  host.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, 3500);
+}
+
+function setProgress(pct){
+  const bar = $('#progressBar');
+  bar.style.width = pct + '%';
+  if(pct >= 100){ setTimeout(()=>{ bar.style.width = '0%'; }, 400); }
+}
+
+function pad(n){ return n.toString().padStart(2,'0'); }
+function logActivity(text, level='info'){
+  const d = new Date();
+  const ts = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  LOG.push({ ts, text, level });
+  if(LOG.length > 300) LOG.shift();
+  renderLog();
+}
+
+// Supaya error JS gak lagi "diam-diam" bikin app mati tanpa jejak — tampil di Activity Log juga.
+window.addEventListener('error', (e) => {
+  try{ logActivity('JS Error: ' + (e.error?.message || e.message), 'err'); }catch(_e){}
+});
+window.addEventListener('unhandledrejection', (e) => {
+  try{ logActivity('Promise Error: ' + (e.reason?.message || e.reason), 'err'); }catch(_e){}
+});
+function renderLog(){
+  const body = $('#activityBody');
+  body.innerHTML = LOG.map(l => `<div class="log-line ${l.level}"><span class="lt">[${l.ts}]</span>${escapeHtml(l.text)}</div>`).join('');
+  body.scrollTop = body.scrollHeight;
+}
+
+// ============ Storage helpers ============
+async function storeGet(key){
+  try{
+    if(window.storage){
+      const r = await window.storage.get(key, false);
+      return r ? JSON.parse(r.value) : null;
+    }
+  }catch(e){ /* lanjut coba localStorage */ }
+  try{
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+async function storeSet(key, value){
+  try{
+    if(window.storage){
+      await window.storage.set(key, JSON.stringify(value), false);
+      return true;
+    }
+  }catch(e){ /* lanjut coba localStorage */ }
+  try{
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  }catch(e){ console.error('storage set error', e); return false; }
+}
+
+async function loadAll(){
+  CONFIG = await storeGet('td:config');
+  FOLDERS = (await storeGet('td:folders')) || [];
+  EXPANDED = new Set((await storeGet('td:expanded')) || []);
+  FILES = (await storeGet('td:files')) || [];
+  updateOffset = (await storeGet('td:offset')) || 0;
+  pageSize = (await storeGet('td:pagesize')) || 50;
+  theme = (await storeGet('td:theme')) || 'dark';
+
+  // File ini punya bot & chat ID bawaan (tertanam di kode). Supaya SEMUA device/browser
+  // yang buka file yang sama pasti nyambung ke chat Telegram yang SAMA (dan filenya kelihatan
+  // sama di semua device), config bawaan ini selalu dipakai — menimpa config lama yang mungkin
+  // masih nyangkut di local storage browser dari sesi/testing sebelumnya.
+  if(DEFAULT_BOT_TOKEN && DEFAULT_CHAT_ID){
+    const mismatch = !CONFIG || CONFIG.botToken !== DEFAULT_BOT_TOKEN || String(CONFIG.chatId) !== String(DEFAULT_CHAT_ID);
+    if(mismatch){
+      CONFIG = { botToken: DEFAULT_BOT_TOKEN, chatId: DEFAULT_CHAT_ID, botUsername: DEFAULT_BOT_USERNAME || '' };
+      await saveConfig();
+    }
+  } else if(!CONFIG && DEFAULT_BOT_TOKEN){
+    await autoConnect(DEFAULT_BOT_TOKEN);
+  }
+  if(CONFIG) subscribeRealtime();
+}
+
+async function autoConnect(token){
+  try{
+    const meRes = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+    const meData = await meRes.json();
+    if(!meData.ok) return false;
+    const username = meData.result.username;
+
+    const upRes = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=20`);
+    const upData = await upRes.json();
+    if(!upData.ok || !upData.result.length) return false;
+
+    const last = upData.result[upData.result.length - 1];
+    const msg = last.message || last.channel_post;
+    if(!msg) return false;
+
+    CONFIG = { botToken: token, chatId: msg.chat.id, botUsername: username };
+    updateOffset = last.update_id;
+    await saveConfig();
+    await saveOffset();
+    return true;
+  }catch(e){ return false; }
+}
+async function saveConfig(){ await storeSet('td:config', CONFIG); }
+async function saveFolders(){ await storeSet('td:folders', FOLDERS); scheduleIndexPush(); }
+async function saveExpanded(){ await storeSet('td:expanded', Array.from(EXPANDED)); }
+async function saveFiles(){ await storeSet('td:files', FILES); scheduleIndexPush(); }
+async function saveOffset(){ await storeSet('td:offset', updateOffset); }
+async function savePageSize(){ await storeSet('td:pagesize', pageSize); }
+async function saveTheme(){ await storeSet('td:theme', theme); }
+
+// ============ Telegram API ============
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+// Bungkus fetch+parse Telegram API dengan retry otomatis kalau kena rate limit
+// (Telegram balikin ok:false + parameters.retry_after kalau kirim pesan kebanyakan
+// & kecepetan ke chat yang sama). Tanpa ini, upload banyak file berurutan bisa
+// gagal di tengah jalan padahal cuma soal timing, bukan error sungguhan.
+async function tgFetchJson(url, options, maxRetries = 5){
+  for(let attempt = 0; attempt <= maxRetries; attempt++){
+    const res = await fetch(url, options);
+    const data = await res.json();
+    if(data.ok) return data;
+    const retryAfter = data.parameters && data.parameters.retry_after;
+    if(retryAfter && attempt < maxRetries){
+      logActivity(`Kena rate limit Telegram, tunggu ${retryAfter}s lalu coba lagi...`, 'warn');
+      await sleep(retryAfter * 1000 + 300);
+      continue;
+    }
+    throw new Error(data.description || 'Telegram API error');
+  }
+}
+
+function tgUrl(method){ return `https://api.telegram.org/bot${CONFIG.botToken}/${method}`; }
+
+async function tgCall(method, params={}){
+  const data = await tgFetchJson(tgUrl(method), {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(params)
+  });
+  return data.result;
+}
+
+// Batas keras dari Telegram Bot API sendiri (bukan setting aplikasi) — bot cuma boleh kirim
+// file maks 50MB. Di-cek di sini dulu supaya errornya jelas, bukan "Request Entity Too Large"
+// yang membingungkan dari server Telegram.
+const TELEGRAM_MAX_FILE_SIZE = 50 * 1024 * 1024;
+
+async function tgUpload(file){
+  if(file.size > TELEGRAM_MAX_FILE_SIZE){
+    const sizeMB = (file.size / (1024*1024)).toFixed(1);
+    throw new Error(`File ${sizeMB}MB melebihi batas 50MB dari Telegram Bot API (bukan batas aplikasi ini)`);
+  }
+  const form = new FormData();
+  form.append('chat_id', CONFIG.chatId);
+  form.append('document', file);
+  const data = await tgFetchJson(tgUrl('sendDocument'), { method:'POST', body: form });
+  return data.result;
+}
+
+// ============ Sinkron lintas-device ============
+// Struktur folder/file (FOLDERS + FILES) disimpan sebagai satu file JSON tersembunyi
+// yang di-upload & di-pin di chat Telegram itu sendiri. Karena semua device terhubung
+// ke bot & chat yang sama, device manapun bisa menarik metadata terbaru dari pesan
+// yang di-pin ini — sehingga struktur folder, nama file, favorit, dll ikut terlihat
+// di device lain, bukan cuma isi file mentahnya.
+const INDEX_FILENAME = '.tgdrive-index.json';
+let indexPushTimer = null;
+let indexPushInFlight = false;
+
+function scheduleIndexPush(){
+  if(!CONFIG) return;
+  clearTimeout(indexPushTimer);
+  indexPushTimer = setTimeout(() => {
+    indexPushTimer = null;
+    pushIndexToCloud().catch(e => logActivity('Gagal sync metadata ke cloud: ' + e.message, 'err'));
+  }, 1500);
+}
+
+let lastPushedAt = 0;
+
+async function pushIndexToCloud(){
+  if(!CONFIG || indexPushInFlight) return;
+  indexPushInFlight = true;
+  try{
+    if(sb){
+      lastPushedAt = Date.now();
+      const { error } = await sb.from('td_index').upsert({
+        chat_id: CONFIG.chatId,
+        data: { folders: FOLDERS, files: FILES },
+        updated_at: new Date(lastPushedAt).toISOString()
+      });
+      if(error) throw new Error(error.message);
+      logActivity('Metadata disinkron ke Cloud', 'ok');
+      return;
+    }
+    // Fallback lama: upload+pin file JSON di chat Telegram (dipakai kalau Supabase belum di-setup)
+    const payload = JSON.stringify({ folders: FOLDERS, files: FILES, v: Date.now() });
+    const blob = new Blob([payload], { type: 'application/json' });
+    const form = new FormData();
+    form.append('chat_id', CONFIG.chatId);
+    form.append('document', blob, INDEX_FILENAME);
+    form.append('disable_notification', 'true');
+    const res = await fetch(tgUrl('sendDocument'), { method:'POST', body: form });
+    const data = await res.json();
+    if(!data.ok) throw new Error(data.description || 'Gagal upload index');
+    try{
+      await tgCall('pinChatMessage', { chat_id: CONFIG.chatId, message_id: data.result.message_id, disable_notification: true });
+    }catch(e){ logActivity('Index tersimpan tapi GAGAL di-pin: ' + e.message + ' (metadata belum tersedia di cloud)', 'err'); }
+    logActivity('Metadata disinkron ke cloud', 'ok');
+  } finally {
+    indexPushInFlight = false;
+  }
+}
+
+// Endpoint /file/bot.../... di Telegram tidak mengirim header CORS, jadi fetch() langsung
+// dari browser sering diblokir ("Failed to fetch") meskipun URL-nya valid & filenya ada.
+// Ini fallback lewat beberapa proxy CORS publik (dicoba satu-satu) untuk kasus itu — supaya
+// kalau satu proxy lagi down/diblokir jaringan tertentu (misal di HP), masih ada cadangan lain.
+const CORS_PROXIES = [
+  (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
+const CROSS_ORIGIN_TIMEOUT_MS = 6000; // jangan biarkan 1 jalur yg lemot bikin sync lama
+const LAST_GOOD_PROXY_KEY = 'td:lastGoodProxyIdx';
+
+async function fetchWithTimeout(url, timeoutMs){
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try{
+    return await fetch(url, { signal: ctrl.signal });
+  }catch(e){
+    if(e.name === 'AbortError') throw new Error('timeout ' + timeoutMs + 'ms');
+    throw e;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
+function getLastGoodProxyIdx(){
+  const v = parseInt(localStorage.getItem(LAST_GOOD_PROXY_KEY), 10);
+  return Number.isInteger(v) && v >= 0 && v < CORS_PROXIES.length ? v : -1;
+}
+function setLastGoodProxyIdx(idx){
+  try{ localStorage.setItem(LAST_GOOD_PROXY_KEY, String(idx)); }catch(e){}
+}
+
+async function fetchTextCrossOrigin(url){
+  try{
+    const res = await fetchWithTimeout(url, CROSS_ORIGIN_TIMEOUT_MS);
+    if(res.ok) return await res.text();
+  }catch(e){ /* lanjut coba proxy di bawah */ }
+
+  // Coba dulu proxy yang terakhir kali berhasil, supaya jalur yg sering nyala dipakai duluan
+  // (bukan selalu mulai dari yang pertama & nunggu yg sering mati gagal dulu).
+  const lastGoodIdx = getLastGoodProxyIdx();
+  const order = lastGoodIdx === -1
+    ? CORS_PROXIES.map((_, i) => i)
+    : [lastGoodIdx, ...CORS_PROXIES.map((_, i) => i).filter(i => i !== lastGoodIdx)];
+
+  let lastErr = null;
+  for(const idx of order){
+    try{
+      const res = await fetchWithTimeout(CORS_PROXIES[idx](url), CROSS_ORIGIN_TIMEOUT_MS);
+      if(res.ok){ setLastGoodProxyIdx(idx); return await res.text(); }
+      lastErr = new Error('HTTP ' + res.status);
+    }catch(e){ lastErr = e; }
+  }
+  throw new Error('Semua jalur gagal (langsung & ' + CORS_PROXIES.length + ' proxy): ' + (lastErr?.message || 'unknown'));
+}
+
+// Ambil index terbaru dari Supabase (atau fallback pesan yang di-pin di Telegram).
+// Mengembalikan true kalau berhasil menerapkan data baru.
+async function pullIndexFromCloud(){
+  if(!CONFIG) return false;
+  try{
+    if(sb){
+      const { data, error } = await sb.from('td_index').select('data, updated_at').eq('chat_id', CONFIG.chatId).maybeSingle();
+      if(error) throw new Error(error.message);
+      if(!data){ logActivity('Belum ada metadata di Cloud.', 'warn'); return false; }
+      applyCloudIndex(data.data);
+      logActivity('Metadata tersinkron dari Cloud', 'ok');
+      return true;
+    }
+    const chat = await tgCall('getChat', { chat_id: CONFIG.chatId });
+    const pinned = chat.pinned_message;
+    if(!pinned || !pinned.document){ logActivity('Belum ada metadata cloud yang di-pin.', 'warn'); return false; }
+    const fname = pinned.document.file_name || '';
+    if(!fname.toLowerCase().includes('tgdrive-index')){ logActivity(`Pesan yang di-pin bukan index (nama: ${fname||'?'})`, 'warn'); return false; }
+    const fileInfo = await tgCall('getFile', { file_id: pinned.document.file_id });
+    const url = `https://api.telegram.org/file/bot${CONFIG.botToken}/${fileInfo.file_path}`;
+    const text = await fetchTextCrossOrigin(url);
+    const parsed = JSON.parse(text);
+    if(parsed && Array.isArray(parsed.folders) && Array.isArray(parsed.files)){
+      applyCloudIndex(parsed);
+      logActivity('Metadata tersinkron dari cloud', 'ok');
+      return true;
+    }
+  }catch(e){
+    logActivity('Gagal memuat index cloud: ' + e.message, 'warn');
+  }
+  return false;
+}
+
+async function applyCloudIndex(parsed){
+  if(!parsed || !Array.isArray(parsed.folders) || !Array.isArray(parsed.files)) return;
+  FOLDERS = parsed.folders;
+  FILES = parsed.files;
+  await storeSet('td:folders', FOLDERS);
+  await storeSet('td:files', FILES);
+  renderFolders(); renderTable();
+}
+
+// Realtime: begitu device lain push perubahan, device ini langsung update tanpa nunggu polling.
+function subscribeRealtime(){
+  if(!sb || !CONFIG) return;
+  if(realtimeChannel) sb.removeChannel(realtimeChannel);
+  realtimeChannel = sb
+    .channel('td_index_' + CONFIG.chatId)
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'td_index', filter: `chat_id=eq.${CONFIG.chatId}` },
+      (payload) => {
+        // Abaikan echo dari push sendiri (barusan kita yang nulis)
+        if(Date.now() - lastPushedAt < 3000) return;
+        if(payload.new && payload.new.data){
+          applyCloudIndex(payload.new.data);
+          logActivity('Update realtime dari device lain diterapkan', 'ok');
+        }
+      }
+    )
+    .subscribe();
+}
+
+// ============ Setup Modal ============
+function showSetupModal(){
+  const existingToken = CONFIG?.botToken || DEFAULT_BOT_TOKEN || '';
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h2>Hubungkan Bot Telegram</h2>
+      <div class="desc">Buat bot pribadi lewat @BotFather di Telegram — bot ini akan jadi "drive" pribadimu. Jangan pernah bagikan token bot ke orang lain.</div>
+
+      <div class="step"><div class="num">1</div><div class="txt">Buka Telegram, chat <b>@BotFather</b>, kirim <b>/newbot</b>, ikuti instruksinya. Kamu akan dapat <b>token</b> seperti <code>123456:ABC-def...</code></div></div>
+      <div class="step"><div class="num">2</div><div class="txt">Tempel token itu di bawah, lalu klik <b>Verifikasi Token</b>.</div></div>
+      <div class="step"><div class="num">3</div><div class="txt">Buka bot kamu di Telegram (link akan muncul), kirim pesan apa saja (misal "halo"), lalu klik <b>Deteksi Chat ID</b>.</div></div>
+
+      <div class="field">
+        <label>Bot Token</label>
+        <input type="password" id="inpToken" placeholder="123456789:AAExxxxxxxxxxxxxxxxxxxxxxxxxxxxx" value="${existingToken}">
+      </div>
+      <button class="btn btn-ghost" id="verifyTokenBtn" style="width:100%; justify-content:center; margin-bottom:8px;">Verifikasi Token</button>
+
+      <div id="botInfoBox" style="display:none;">
+        <div class="field">
+          <label>Bot ditemukan</label>
+          <input type="text" id="botNameDisplay" disabled>
+        </div>
+        <button class="btn btn-ghost" id="openBotBtn" style="width:100%; justify-content:center; margin-bottom:8px;">Buka Chat dengan Bot ↗</button>
+        <button class="btn btn-primary" id="detectChatBtn" style="width:100%; justify-content:center;">Deteksi Chat ID</button>
+      </div>
+
+      <div class="status-line" id="setupStatus"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="closeSetup">Tutup</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const statusEl = overlay.querySelector('#setupStatus');
+  function setStatus(msg, ok){
+    statusEl.textContent = msg;
+    statusEl.className = 'status-line show ' + (ok ? 'ok' : 'err');
+  }
+
+  let tempToken = existingToken;
+  let tempUsername = '';
+
+  overlay.querySelector('#closeSetup').onclick = () => overlay.remove();
+
+  overlay.querySelector('#verifyTokenBtn').onclick = async () => {
+    const token = overlay.querySelector('#inpToken').value.trim();
+    if(!token){ setStatus('Isi token dulu.', false); return; }
+    try{
+      const res = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+      const data = await res.json();
+      if(!data.ok) throw new Error(data.description || 'Token tidak valid');
+      tempToken = token;
+      tempUsername = data.result.username;
+      overlay.querySelector('#botInfoBox').style.display = 'block';
+      overlay.querySelector('#botNameDisplay').value = '@' + tempUsername;
+      setStatus('Token valid. Lanjut ke langkah 3.', true);
+    }catch(e){
+      setStatus('Gagal: ' + e.message, false);
+    }
+  };
+
+  overlay.querySelector('#openBotBtn').onclick = () => {
+    window.open(`https://t.me/${tempUsername}`, '_blank');
+  };
+
+  overlay.querySelector('#detectChatBtn').onclick = async () => {
+    try{
+      setStatus('Mendeteksi...', true);
+      const res = await fetch(`https://api.telegram.org/bot${tempToken}/getUpdates?limit=20`);
+      const data = await res.json();
+      if(!data.ok) throw new Error(data.description);
+      if(!data.result.length){ setStatus('Belum ada pesan. Kirim pesan ke bot dulu, lalu coba lagi.', false); return; }
+      const last = data.result[data.result.length - 1];
+      const msg = last.message || last.channel_post;
+      if(!msg){ setStatus('Tidak ditemukan pesan valid.', false); return; }
+      const chatId = msg.chat.id;
+      CONFIG = { botToken: tempToken, chatId: chatId, botUsername: tempUsername };
+      updateOffset = last.update_id;
+      await saveConfig();
+      await saveOffset();
+      setStatus('Terhubung! Chat ID: ' + chatId, true);
+      updateStatusUI();
+      toast('Bot berhasil terhubung', 'ok');
+      logActivity(`Bot berhasil login`, 'ok');
+      subscribeRealtime();
+      setTimeout(()=>{ overlay.remove(); syncInbox(); startAutoSync(); }, 900);
+    }catch(e){
+      setStatus('Gagal: ' + e.message, false);
+    }
+  };
+}
+
+function updateStatusUI(){
+  const connected = !!CONFIG;
+  $('#statusDot').className = 'status-dot ' + (connected ? 'on' : 'off');
+  $('#statusText').textContent = connected ? 'Connected' : 'Belum terhubung';
+  $('#statusText').className = 'stext ' + (connected ? 'on' : '');
+  $('#sbConn').textContent = connected ? 'Connected' : 'Belum terhubung';
+  $('#sbConn').className = connected ? 'sb-connected' : 'sb-disconnected';
+}
+
+// ============ Folders (tree) ============
+function getChildFolders(parentId){
+  return FOLDERS.filter(f => (f.parentId || null) === (parentId || null));
+}
+function countFilesInFolder(folderId){
+  return FILES.filter(x => x.folderId === folderId && !x.trashed).length;
+}
+function flattenFolderOptions(parentId, depth){
+  let out = [];
+  getChildFolders(parentId).forEach(fo => {
+    out.push({ id: fo.id, name: fo.name, depth });
+    out = out.concat(flattenFolderOptions(fo.id, depth + 1));
+  });
+  return out;
+}
+
+function renderFolders(){
+  const list = $('#folderList');
+  list.innerHTML = '';
+  renderFolderLevel(list, null, 0);
+  list.querySelectorAll('.nav-item[data-view]').forEach(el => el.addEventListener('click', () => setView(el.dataset.view)));
+  list.querySelectorAll('.folder-del').forEach(el => el.addEventListener('click', (e) => { e.stopPropagation(); deleteFolder(el.dataset.del); }));
+  list.querySelectorAll('.folder-add').forEach(el => el.addEventListener('click', (e) => { e.stopPropagation(); createFolder(el.dataset.add); }));
+  list.querySelectorAll('.folder-toggle[data-toggle]').forEach(el => el.addEventListener('click', (e) => { e.stopPropagation(); toggleFolder(el.dataset.toggle); }));
+}
+
+function renderFolderLevel(container, parentId, depth){
+  getChildFolders(parentId).forEach(f => {
+    const hasChildren = getChildFolders(f.id).length > 0;
+    const isExpanded = EXPANDED.has(f.id);
+    const count = countFilesInFolder(f.id);
+    const row = document.createElement('div');
+    row.className = 'folder-row';
+    row.style.paddingLeft = (depth * 12) + 'px';
+    row.innerHTML = `
+      <div class="folder-toggle ${hasChildren ? (isExpanded?'expanded':'') : 'spacer'}" ${hasChildren ? `data-toggle="${f.id}"` : ''}>
+        ${hasChildren ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 18l6-6-6-6"/></svg>' : ''}
+      </div>
+      <div class="nav-item ${currentView===f.id?'active':''}" data-view="${f.id}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span class="label">${escapeHtml(f.name)}</span>
+        <span class="count">${count}</span>
+      </div>
+      <div class="folder-add" data-add="${f.id}" title="Sub-folder baru">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      </div>
+      <div class="folder-del" data-del="${f.id}" title="Hapus folder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </div>
+    `;
+    container.appendChild(row);
+    if(hasChildren && isExpanded) renderFolderLevel(container, f.id, depth + 1);
+  });
+}
+
+async function toggleFolder(id){
+  if(EXPANDED.has(id)) EXPANDED.delete(id); else EXPANDED.add(id);
+  await saveExpanded();
+  renderFolders();
+}
+
+async function createFolder(parentId){
+  const name = prompt(parentId ? 'Nama sub-folder baru:' : 'Nama folder baru:');
+  if(!name || !name.trim()) return;
+  FOLDERS.push({ id: uid(), name: name.trim(), parentId: parentId || null });
+  if(parentId){ EXPANDED.add(parentId); await saveExpanded(); }
+  await saveFolders();
+  renderFolders();
+  renderTable();
+  toast('Folder dibuat', 'ok');
+  logActivity(`Folder created: ${name.trim()}`, 'ok');
+}
+
+async function deleteFolder(id){
+  const folder = FOLDERS.find(f=>f.id===id);
+  if(!folder) return;
+  const childCount = getChildFolders(id).length;
+  const msg = childCount
+    ? `Hapus folder "${folder.name}"? File di dalamnya pindah ke Kotak Masuk, dan ${childCount} sub-folder di dalamnya naik satu tingkat.`
+    : `Hapus folder "${folder.name}"? File di dalamnya akan dipindah ke Kotak Masuk.`;
+  if(!confirm(msg)) return;
+  FILES.forEach(f => { if(f.folderId === id) f.folderId = null; });
+  FOLDERS.forEach(f => { if(f.parentId === id) f.parentId = folder.parentId || null; });
+  FOLDERS = FOLDERS.filter(f => f.id !== id);
+  EXPANDED.delete(id);
+  await saveFolders();
+  await saveFiles();
+  await saveExpanded();
+  if(currentView === id) setView('all');
+  else { renderFolders(); renderTable(); }
+  toast('Folder dihapus', 'ok');
+  logActivity(`Folder deleted: ${folder.name}`, 'warn');
+}
+
+// ============ View / Selection ============
+function setView(view){
+  currentView = view;
+  SELECTED.clear();
+  $$('.nav-item[data-view]').forEach(el => el.classList.toggle('active', el.dataset.view === view));
+  renderFolders();
+  renderTable();
+}
+
+function clearSelection(){ SELECTED.clear(); renderTable(); }
+
+function toggleSelect(key, additive){
+  if(additive){
+    if(SELECTED.has(key)) SELECTED.delete(key); else SELECTED.add(key);
+  }else{
+    SELECTED.clear();
+    SELECTED.add(key);
+  }
+  renderTable();
+}
+
+// Deteksi "double-tap" manual berbasis event click biasa, karena event dblclick
+// gak reliable di touchscreen (banyak browser HP nganggep double-tap = zoom).
+// Tap pertama = select baris, tap kedua (dalam 400ms, baris yang sama) = buka.
+let lastTapKey = null;
+let lastTapTime = 0;
+function handleRowTap(key, additive, onOpen){
+  if(additive){
+    toggleSelect(key, true);
+    lastTapKey = null;
+    return;
+  }
+  const now = Date.now();
+  if(lastTapKey === key && (now - lastTapTime) < 400){
+    lastTapKey = null;
+    onOpen();
+  } else {
+    toggleSelect(key, false);
+    lastTapKey = key;
+    lastTapTime = now;
+  }
+}
+
+function getSelectedFiles(){
+  return Array.from(SELECTED).filter(k=>k.startsWith('f_')).map(k => FILES.find(f=>f.id===k.slice(2))).filter(Boolean);
+}
+function getSelectedFolders(){
+  return Array.from(SELECTED).filter(k=>k.startsWith('d_')).map(k => FOLDERS.find(f=>f.id===k.slice(2))).filter(Boolean);
+}
+
+function getViewFiles(){
+  let list;
+  if(currentView === 'trash') list = FILES.filter(f => f.trashed);
+  else if(currentView === 'favorites') list = FILES.filter(f => f.favorite && !f.trashed);
+  else if(currentView === 'inbox' || currentView === 'all') list = FILES.filter(f => !f.folderId && !f.trashed);
+  else list = FILES.filter(f => f.folderId === currentView && !f.trashed);
+
+  const q = $('#searchInput').value.trim().toLowerCase();
+  if(q) list = list.filter(f => f.name.toLowerCase().includes(q));
+  if(filterKind !== 'all') list = list.filter(f => f.kind === filterKind);
+
+  list = list.slice().sort((a,b) => {
+    let r = 0;
+    if(sortKey === 'name') r = a.name.localeCompare(b.name);
+    else if(sortKey === 'ts') r = a.ts - b.ts;
+    else if(sortKey === 'size') r = (a.size||0) - (b.size||0);
+    return sortDir === 'asc' ? r : -r;
+  });
+  return list;
+}
+
+function fmtSize(bytes){
+  if(!bytes) return '—';
+  const units = ['B','KB','MB','GB','TB'];
+  let i=0, n=bytes;
+  while(n>=1024 && i<units.length-1){ n/=1024; i++; }
+  return n.toFixed(n<10&&i>0?1:0) + ' ' + units[i];
+}
+function fmtDate(ts){
+  const d = new Date(ts);
+  return d.toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'}) + ' ' + d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+}
+function iconFor(kind){
+  const icons = {
+    image: '<path d="M3 3h18v18H3z"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>',
+    video: '<path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>',
+    document: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+    audio: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    other: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>'
+  };
+  return icons[kind] || icons.other;
+}
+function typeLabel(kind){
+  const l = { image:'Image', video:'Video', audio:'Audio', document:'Document', other:'File' };
+  return l[kind] || 'File';
+}
+function escapeHtml(s){
+  const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML;
+}
+function folderName(id){
+  if(!id) return '/';
+  const f = FOLDERS.find(x=>x.id===id);
+  return f ? f.name : '/';
+}
+
+// ============ Table render ============
+function updateToolbarState(){
+  const n = SELECTED.size;
+  const singleFile = getSelectedFiles().length === 1 && getSelectedFolders().length === 0;
+  const anySelected = n > 0;
+  $('#downloadBtn').disabled = getSelectedFiles().length === 0;
+  $('#deleteBtn').disabled = !anySelected;
+  $('#renameBtn').disabled = n !== 1;
+  $('#moveBtn').disabled = !anySelected || currentView === 'trash';
+  $('#copyBtn').disabled = getSelectedFiles().length === 0 || currentView === 'trash';
+  $('#favBtn').disabled = getSelectedFiles().length === 0 || currentView === 'trash';
+  $('#propsBtn').disabled = n !== 1;
+}
+
+function renderTable(){
+  const tbody = $('#tableBody');
+  const list = getViewFiles();
+  const folderTiles = (currentView === 'all') ? getChildFolders(null)
+    : (currentView === 'inbox' || currentView === 'favorites' || currentView === 'trash') ? []
+    : getChildFolders(currentView);
+
+  tbody.innerHTML = '';
+
+  $('#countAll').textContent = FILES.filter(f=>!f.trashed).length;
+  $('#countInbox').textContent = FILES.filter(f=>!f.folderId && !f.trashed).length;
+  $('#countFav').textContent = FILES.filter(f=>f.favorite && !f.trashed).length;
+  $('#countTrash').textContent = FILES.filter(f=>f.trashed).length;
+
+  if(folderTiles.length === 0 && list.length === 0){
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${currentView==='trash' ? 'Sampah kosong.' : 'Belum ada file di sini.'}</td></tr>`;
+    updateStatusBarCounts(0);
+    updateToolbarState();
+    updateStorageBar();
+    return;
+  }
+
+  folderTiles.forEach(fo => {
+    const key = 'd_' + fo.id;
+    const tr = document.createElement('tr');
+    tr.dataset.key = key;
+    if(SELECTED.has(key)) tr.classList.add('selected');
+    tr.innerHTML = `
+      <td></td>
+      <td class="col-name"><svg viewBox="0 0 24 24" fill="none" stroke="#E8B34A" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>${escapeHtml(fo.name)}</td>
+      <td class="muted">${escapeHtml(folderName(fo.parentId))}</td>
+      <td class="muted">—</td>
+      <td class="muted">—</td>
+      <td>Folder</td>
+      <td></td>
+    `;
+    tr.addEventListener('click', (e) => handleRowTap(key, e.ctrlKey || e.metaKey, () => setView(fo.id)));
+    tbody.appendChild(tr);
+  });
+
+  list.forEach(f => {
+    const key = 'f_' + f.id;
+    const tr = document.createElement('tr');
+    tr.dataset.key = key;
+    if(SELECTED.has(key)) tr.classList.add('selected');
+    const statusTag = f.trashed ? `<span class="status-tag trash">Sampah</span>` : `<span class="status-tag ok">Tersimpan</span>`;
+    tr.innerHTML = `
+      <td></td>
+      <td class="col-name">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">${iconFor(f.kind)}</svg>
+        ${f.favorite ? '<span class="fav-star">★</span>' : ''}${escapeHtml(f.name)}
+      </td>
+      <td class="muted">${escapeHtml(folderName(f.folderId))}</td>
+      <td class="muted">${fmtDate(f.ts)}</td>
+      <td class="muted">${fmtSize(f.size)}</td>
+      <td>${typeLabel(f.kind)}</td>
+      <td>${statusTag}</td>
+    `;
+    tr.addEventListener('click', (e) => handleRowTap(key, e.ctrlKey || e.metaKey, () => previewFile(f.id)));
+    tbody.appendChild(tr);
+  });
+
+  updateStatusBarCounts(folderTiles.length + list.length);
+  updateToolbarState();
+  updateStorageBar();
+}
+
+function updateStatusBarCounts(itemCount){
+  $('#sbItems').textContent = `${itemCount} items`;
+  $('#sbSelected').textContent = `${SELECTED.size} selected`;
+}
+
+const STORAGE_MAX_BYTES = 100 * 1024 * 1024 * 1024 * 1024; // 100 TB
+const STORAGE_CATEGORIES = {
+  image:    { label: 'Gambar',  color: '#22c55e' },
+  video:    { label: 'Video',   color: '#f97316' },
+  audio:    { label: 'Audio',   color: '#a855f7' },
+  document: { label: 'Dokumen', color: '#3b82f6' },
+  other:    { label: 'Lainnya', color: '#6b7280' }
+};
+function updateStorageBar(){
+  const totalBytes = FILES.reduce((sum, f) => sum + (f.size || 0), 0);
+  const pct = Math.min(100, (totalBytes / STORAGE_MAX_BYTES) * 100);
+  const pctDisplay = pct > 0 && pct < 0.01 ? '<0.01' : pct.toFixed(pct < 10 ? 2 : 1);
+  const fillEl = $('#storageFill');
+  const usedEl = $('#storageUsed');
+  const pctEl = $('#storagePct');
+  if(usedEl) usedEl.textContent = fmtSize(totalBytes) === '—' ? '0 B' : fmtSize(totalBytes);
+  if(fillEl) fillEl.style.width = Math.max(pct, totalBytes > 0 ? 0.3 : 0) + '%';
+  if(pctEl) pctEl.textContent = `${pctDisplay}% terpakai`;
+
+  // Breakdown per kategori (Gambar, Video, Audio, Dokumen, Lainnya)
+  const byKind = {};
+  FILES.forEach(f => {
+    const kind = STORAGE_CATEGORIES[f.kind] ? f.kind : 'other';
+    byKind[kind] = (byKind[kind] || 0) + (f.size || 0);
+  });
+  const entries = Object.keys(STORAGE_CATEGORIES)
+    .map(kind => ({ kind, bytes: byKind[kind] || 0, ...STORAGE_CATEGORIES[kind] }))
+    .filter(e => e.bytes > 0)
+    .sort((a, b) => b.bytes - a.bytes);
+
+  const stackEl = $('#storageStack');
+  const legendEl = $('#storageLegend');
+  if(stackEl){
+    stackEl.innerHTML = entries.length ? entries.map(e => {
+      const w = totalBytes > 0 ? (e.bytes / totalBytes) * 100 : 0;
+      return `<div class="seg" style="width:${w}%;background:${e.color}" title="${e.label}: ${fmtSize(e.bytes)}"></div>`;
+    }).join('') : '';
+  }
+  if(legendEl){
+    legendEl.innerHTML = entries.length ? entries.map(e => `
+      <div class="sb-legend-item">
+        <span class="sb-dot" style="background:${e.color}"></span>
+        <span class="sb-lname">${e.label}</span>
+        <span class="sb-lsize">${fmtSize(e.bytes)}</span>
+      </div>
+    `).join('') : '<div class="sb-legend-item"><span class="sb-lname">Belum ada file</span></div>';
+  }
+}
+
+// ============ File actions ============
+async function downloadFile(fileId){
+  const f = FILES.find(x=>x.id===fileId);
+  if(!f) return;
+  try{
+    const result = await tgCall('getFile', { file_id: f.tgFileId });
+    const url = `https://api.telegram.org/file/bot${CONFIG.botToken}/${result.file_path}`;
+    const a = document.createElement('a');
+    a.href = url; a.download = f.name; a.target = '_blank';
+    document.body.appendChild(a); a.click(); a.remove();
+    logActivity(`Download started: ${f.name}`, 'info');
+  }catch(e){
+    toast('Gagal mengunduh: ' + e.message, 'err');
+    logActivity(`Download failed: ${f.name} — ${e.message}`, 'err');
+  }
+}
+
+async function downloadSelected(){
+  const files = getSelectedFiles();
+  if(!files.length) return;
+  for(const f of files) await downloadFile(f.id);
+}
+
+async function previewFile(fileId){
+  const f = FILES.find(x=>x.id===fileId);
+  if(!f) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML = `
+    <div class="preview-modal">
+      <div class="preview-head">
+        <div style="min-width:0;">
+          <div class="pname" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
+          <div class="pmeta">${fmtSize(f.size)} · ${fmtDate(f.ts)}</div>
+        </div>
+        <div class="preview-head-actions">
+          <div class="icon-btn" id="previewDlBtn" title="Unduh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></div>
+          <div class="icon-btn" id="closePreview" title="Tutup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+        </div>
+      </div>
+      <div class="preview-body" id="previewBody">
+        <div class="preview-loading"><div class="spin"></div> Memuat pratinjau…</div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e)=>{ if(e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#closePreview').onclick = () => overlay.remove();
+  overlay.querySelector('#previewDlBtn').onclick = () => downloadFile(f.id);
+
+  const body = overlay.querySelector('#previewBody');
+  try{
+    const result = await tgCall('getFile', { file_id: f.tgFileId });
+    const url = `https://api.telegram.org/file/bot${CONFIG.botToken}/${result.file_path}`;
+
+    if(f.kind === 'image'){
+      body.innerHTML = `<img src="${url}" alt="${escapeHtml(f.name)}">`;
+    }else if(f.kind === 'video'){
+      body.innerHTML = `<video src="${url}" controls autoplay></video>`;
+    }else if(f.kind === 'audio'){
+      body.innerHTML = `<audio src="${url}" controls autoplay style="width:100%;"></audio>`;
+    }else if((f.mime && f.mime === 'application/pdf') || /\.pdf$/i.test(f.name)){
+      body.innerHTML = `<iframe src="${url}"></iframe>`;
+    }else{
+      body.innerHTML = `
+        <div class="preview-fallback">
+          Pratinjau tidak tersedia untuk tipe file ini.<br>Unduh untuk membukanya.
+        </div>
+      `;
+    }
+  }catch(e){
+    body.innerHTML = `<div class="preview-fallback">Gagal memuat pratinjau: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function deleteSelected(){
+  const files = getSelectedFiles();
+  const folders = getSelectedFolders();
+  if(!files.length && !folders.length) return;
+
+  if(currentView === 'trash'){
+    // Hapus permanen dari sampah
+    if(!confirm(`Hapus permanen ${files.length} file dari sampah? Ini akan menghapus file dari penyimpanan cloud juga.`)) return;
+    for(const f of files){
+      try{ await tgCall('deleteMessage', { chat_id: CONFIG.chatId, message_id: f.tgMessageId }); }catch(e){}
+      FILES = FILES.filter(x => x.id !== f.id);
+      logActivity(`Permanently deleted: ${f.name}`, 'warn');
+    }
+    await saveFiles();
+    SELECTED.clear();
+    renderFolders(); renderTable();
+    toast('File dihapus permanen', 'ok');
+    return;
+  }
+
+  if(!confirm(`Pindahkan ${files.length} file${folders.length? ` dan ${folders.length} folder` : ''} ke Sampah?`)) return;
+  for(const f of files){
+    f.trashed = true;
+    logActivity(`Moved to trash: ${f.name}`, 'warn');
+  }
+  for(const fo of folders){
+    // folder langsung dihapus (bukan konsep sampah untuk folder), sub-folder naik level
+    FILES.forEach(x => { if(x.folderId === fo.id) x.folderId = null; });
+    FOLDERS.forEach(x => { if(x.parentId === fo.id) x.parentId = fo.parentId || null; });
+    FOLDERS = FOLDERS.filter(x => x.id !== fo.id);
+    logActivity(`Folder deleted: ${fo.name}`, 'warn');
+  }
+  await saveFiles();
+  await saveFolders();
+  SELECTED.clear();
+  renderFolders(); renderTable();
+  toast('Dipindahkan ke Sampah', 'ok');
+}
+
+async function restoreFromTrash(fileId){
+  const f = FILES.find(x=>x.id===fileId);
+  if(!f) return;
+  f.trashed = false;
+  await saveFiles();
+  renderTable();
+  toast('File dipulihkan', 'ok');
+  logActivity(`Restored from trash: ${f.name}`, 'ok');
+}
+
+async function renameSelected(){
+  const files = getSelectedFiles();
+  const folders = getSelectedFolders();
+  const item = files[0] || folders[0];
+  if(!item) return;
+  const newName = prompt('Nama baru:', item.name);
+  if(!newName || !newName.trim() || newName.trim() === item.name) return;
+  const oldName = item.name;
+  item.name = newName.trim();
+  if(files[0]){ await saveFiles(); } else { await saveFolders(); }
+  renderFolders(); renderTable();
+  toast('Berhasil di-rename', 'ok');
+  logActivity(`Renamed: ${oldName} → ${item.name}`, 'ok');
+}
+
+async function copySelected(){
+  const files = getSelectedFiles();
+  if(!files.length) return;
+  files.forEach(f => {
+    FILES.push({
+      ...f,
+      id: uid(),
+      name: f.name.replace(/(\.[^.]+)?$/, (ext) => ` (copy)${ext||''}`),
+      favorite: false,
+      isCopy: true,
+      ts: Date.now()
+    });
+    logActivity(`Copied: ${f.name}`, 'ok');
+  });
+  await saveFiles();
+  renderFolders(); renderTable();
+  toast(`${files.length} file disalin (referensi index, file cloud tidak digandakan)`, 'ok');
+}
+
+async function toggleFavoriteSelected(){
+  const files = getSelectedFiles();
+  if(!files.length) return;
+  const makeFav = !files.every(f => f.favorite);
+  files.forEach(f => { f.favorite = makeFav; });
+  await saveFiles();
+  renderTable();
+  toast(makeFav ? 'Ditambahkan ke Favorit' : 'Dihapus dari Favorit', 'ok');
+}
+
+function showPropertiesModal(){
+  const files = getSelectedFiles();
+  const folders = getSelectedFolders();
+  const item = files[0] || folders[0];
+  if(!item) return;
+  const isFile = !!files[0];
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h2>Properties</h2>
+      <div class="field"><label>Nama</label><input type="text" value="${escapeHtml(item.name)}" disabled></div>
+      ${isFile ? `
+        <div class="field"><label>Ukuran</label><input type="text" value="${fmtSize(item.size)}" disabled></div>
+        <div class="field"><label>Tipe</label><input type="text" value="${typeLabel(item.kind)} (${escapeHtml(item.mime||'-')})" disabled></div>
+        <div class="field"><label>Tanggal Upload</label><input type="text" value="${fmtDate(item.ts)}" disabled></div>
+        <div class="field"><label>Folder</label><input type="text" value="${escapeHtml(folderName(item.folderId))}" disabled></div>
+        <div class="field"><label>Favorit</label><input type="text" value="${item.favorite ? 'Ya' : 'Tidak'}" disabled></div>
+        <div class="field"><label>Cloud File ID</label><input type="text" value="${item.tgMessageId}" disabled></div>
+      ` : `
+        <div class="field"><label>Isi</label><input type="text" value="${countFilesInFolder(item.id)} file, ${getChildFolders(item.id).length} sub-folder" disabled></div>
+      `}
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="closeProps">Tutup</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#closeProps').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (e)=>{ if(e.target === overlay) overlay.remove(); });
+}
+
+function showMoveModal(){
+  const files = getSelectedFiles();
+  const folders = getSelectedFolders();
+  if(!files.length && !folders.length) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  const options = [`<div class="nav-item" data-target="">📥 Kotak Masuk (root)</div>`]
+    .concat(flattenFolderOptions(null, 0).map(fo => `<div class="nav-item" data-target="${fo.id}">${'&nbsp;&nbsp;'.repeat(fo.depth)}📁 ${escapeHtml(fo.name)}</div>`));
+  overlay.innerHTML = `
+    <div class="modal">
+      <h2>Pindahkan ke Folder</h2>
+      <div class="desc">Pilih folder tujuan untuk ${files.length + folders.length} item terpilih.</div>
+      <div class="folder-picker-tree" style="max-height:280px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:6px;">
+        ${options.join('')}
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancelMove">Batal</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#cancelMove').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (e)=>{ if(e.target === overlay) overlay.remove(); });
+  overlay.querySelectorAll('[data-target]').forEach(el => {
+    el.onclick = async () => {
+      const target = el.dataset.target || null;
+      files.forEach(f => { f.folderId = target; });
+      folders.forEach(fo => { fo.parentId = target; });
+      if(files.length) await saveFiles();
+      if(folders.length) await saveFolders();
+      overlay.remove();
+      SELECTED.clear();
+      renderFolders(); renderTable();
+      toast('Item dipindahkan', 'ok');
+      logActivity(`Moved ${files.length + folders.length} item(s) to ${target ? folderName(target) : 'root'}`, 'ok');
+    };
+  });
+}
+
+function kindFromMime(mime, name){
+  if(!mime) mime = '';
+  if(mime.startsWith('image/')) return 'image';
+  if(mime.startsWith('video/')) return 'video';
+  if(mime.startsWith('audio/')) return 'audio';
+  if(mime === 'application/pdf' || mime.includes('document') || mime.includes('text')) return 'document';
+  return 'other';
+}
+
+// ============ Auto-folder berdasarkan ekstensi ============
+const EXT_FOLDER_MAP = {
+  jpg:'Gambar', jpeg:'Gambar', png:'Gambar', gif:'Gambar', webp:'Gambar', bmp:'Gambar', svg:'Gambar', heic:'Gambar',
+  mp4:'Video', mkv:'Video', mov:'Video', avi:'Video', webm:'Video', flv:'Video', '3gp':'Video',
+  mp3:'Audio', wav:'Audio', ogg:'Audio', flac:'Audio', m4a:'Audio', aac:'Audio',
+  exe:'Aplikasi', apk:'Aplikasi', msi:'Aplikasi', deb:'Aplikasi', dmg:'Aplikasi', appimage:'Aplikasi',
+  rar:'Arsip', zip:'Arsip', '7z':'Arsip', tar:'Arsip', gz:'Arsip', bz2:'Arsip',
+  pdf:'Dokumen', doc:'Dokumen', docx:'Dokumen', xls:'Dokumen', xlsx:'Dokumen', ppt:'Dokumen', pptx:'Dokumen', txt:'Dokumen', csv:'Dokumen'
+};
+function getExtCategory(filename){
+  if(!filename) return null;
+  const m = /\.([a-z0-9]+)$/i.exec(filename.trim());
+  if(!m) return null;
+  return EXT_FOLDER_MAP[m[1].toLowerCase()] || null;
+}
+async function ensureFolderByName(name, parentId){
+  let folder = FOLDERS.find(f => f.name.toLowerCase() === name.toLowerCase() && (f.parentId||null) === (parentId||null));
+  if(!folder){
+    folder = { id: uid(), name, parentId: parentId || null };
+    FOLDERS.push(folder);
+    await saveFolders();
+  }
+  return folder.id;
+}
+// Bikin/temukan rantai folder dari array nama path (buat Upload Folder), kembalikan id folder terdalam.
+async function ensurePathFolders(pathSegments, baseParentId){
+  let parentId = baseParentId || null;
+  for(const seg of pathSegments){
+    if(!seg) continue;
+    parentId = await ensureFolderByName(seg, parentId);
+  }
+  return parentId;
+}
+
+// ============ Upload ============
+async function handleUploadFiles(fileList){
+  if(!CONFIG){ showSetupModal(); return; }
+  const files = Array.from(fileList);
+  let done = 0;
+  const manualFolderId = (currentView !== 'all' && currentView !== 'inbox' && currentView !== 'favorites' && currentView !== 'trash') ? currentView : null;
+  for(const file of files){
+    try{
+      setProgress(10 + (done/files.length)*80);
+      logActivity(`Upload started: ${file.name}`, 'info');
+      const result = await tgUpload(file);
+      const doc = result.document;
+      const fname = doc.file_name || file.name;
+      let folderId = manualFolderId;
+      if(!folderId){
+        const category = getExtCategory(fname);
+        if(category) folderId = await ensureFolderByName(category, null);
+      }
+      FILES.push({
+        id: uid(), name: fname, folderId, tgFileId: doc.file_id, tgMessageId: result.message_id,
+        size: doc.file_size || file.size, mime: doc.mime_type || file.type, kind: kindFromMime(doc.mime_type || file.type),
+        ts: Date.now(), favorite: false, trashed: false
+      });
+      done++;
+      logActivity(`Upload completed: ${fname}`, 'ok');
+    }catch(e){
+      toast(`Gagal unggah ${file.name}: ${e.message}`, 'err');
+      logActivity(`Upload failed: ${file.name} — ${e.message}`, 'err');
+    }
+  }
+  await saveFiles();
+  setProgress(100);
+  renderFolders();
+  renderTable();
+  if(done) toast(`${done} file berhasil diunggah`, 'ok');
+}
+
+async function handleUploadFolder(fileList){
+  if(!CONFIG){ showSetupModal(); return; }
+  const files = Array.from(fileList);
+  if(!files.length) return;
+  let done = 0;
+  const manualFolderId = (currentView !== 'all' && currentView !== 'inbox' && currentView !== 'favorites' && currentView !== 'trash') ? currentView : null;
+  for(const file of files){
+    try{
+      setProgress(10 + (done/files.length)*80);
+      const rel = file.webkitRelativePath || file.name;
+      const segments = rel.split('/'); segments.pop(); // buang nama file, sisakan path folder
+      const folderId = await ensurePathFolders(segments, manualFolderId);
+      logActivity(`Upload started: ${rel}`, 'info');
+      const result = await tgUpload(file);
+      const doc = result.document;
+      const fname = doc.file_name || file.name;
+      FILES.push({
+        id: uid(), name: fname, folderId, tgFileId: doc.file_id, tgMessageId: result.message_id,
+        size: doc.file_size || file.size, mime: doc.mime_type || file.type, kind: kindFromMime(doc.mime_type || file.type),
+        ts: Date.now(), favorite: false, trashed: false
+      });
+      done++;
+      logActivity(`Upload completed: ${fname}`, 'ok');
+    }catch(e){
+      toast(`Gagal unggah ${file.name}: ${e.message}`, 'err');
+      logActivity(`Upload failed: ${file.name} — ${e.message}`, 'err');
+    }
+  }
+  await saveFiles();
+  setProgress(100);
+  renderFolders();
+  renderTable();
+  if(done) toast(`${done} file (folder) berhasil diunggah`, 'ok');
+}
+
+// ============ Sync ============
+async function syncInbox(silent){
+  if(!CONFIG){ if(!silent) showSetupModal(); return; }
+  if(syncInFlight) return;
+  syncInFlight = true;
+  try{
+    if(!silent){ $('#refreshBtn').disabled = true; setProgress(20); }
+    // Hindari menimpa perubahan lokal yang belum sempat terkirim ke cloud (masih dalam antrean debounce)
+    // Saat auto-sync (silent), index cloud cuma di-pull tiap PULL_EVERY_N_TICKS supaya tidak
+    // membombardir proxy CORS publik tiap 5 detik (itu penyebab utama "kadang gagal, lama").
+    let shouldPull = !indexPushTimer;
+    if(silent && shouldPull){
+      autoSyncTickCount++;
+      shouldPull = (autoSyncTickCount % PULL_EVERY_N_TICKS === 0);
+    }
+    const pulled = shouldPull ? await pullIndexFromCloud() : false;
+    const updates = await tgCall('getUpdates', { offset: updateOffset, limit: 50, timeout: 0 });
+    if(!silent) setProgress(60);
+    let added = 0;
+    for(const u of updates){
+      updateOffset = u.update_id + 1;
+      const msg = u.message;
+      if(!msg) continue;
+      let doc = null, kind = 'other', name = null, size = null, mime = null;
+      if(msg.document){ doc = msg.document; kind = kindFromMime(doc.mime_type, doc.file_name); name = doc.file_name; size = doc.file_size; mime = doc.mime_type; }
+      else if(msg.photo){ const p = msg.photo[msg.photo.length-1]; doc = p; kind='image'; name = `foto_${msg.message_id}.jpg`; size = p.file_size; }
+      else if(msg.video){ doc = msg.video; kind='video'; name = msg.video.file_name || `video_${msg.message_id}.mp4`; size = msg.video.file_size; mime = msg.video.mime_type; }
+      else if(msg.audio){ doc = msg.audio; kind='audio'; name = msg.audio.file_name || `audio_${msg.message_id}.mp3`; size = msg.audio.file_size; mime = msg.audio.mime_type; }
+      else if(msg.voice){ doc = msg.voice; kind='audio'; name = `suara_${msg.message_id}.ogg`; size = msg.voice.file_size; }
+      if(!doc) continue;
+      if(doc.file_name === INDEX_FILENAME) continue; // lewati file index metadata itu sendiri
+      if(FILES.some(f => f.tgMessageId === msg.message_id)) continue;
+      let syncedFolderId = null;
+      const syncedCategory = getExtCategory(name);
+      if(syncedCategory) syncedFolderId = await ensureFolderByName(syncedCategory, null);
+      FILES.push({
+        id: uid(), name, folderId: syncedFolderId, tgFileId: doc.file_id, tgMessageId: msg.message_id,
+        size, mime, kind, ts: (msg.date||Date.now()/1000) * 1000, favorite: false, trashed: false
+      });
+      added++;
+      logActivity(`Synced from Cloud: ${name}`, 'ok');
+    }
+    await saveOffset();
+    if(added){ await saveFiles(); }
+    if(added || pulled){ renderFolders(); renderTable(); }
+    if(!silent){ setProgress(100); toast(added ? `${added} file baru disinkronkan` : (pulled ? 'Data tersinkron dari cloud' : 'Tidak ada file baru'), 'ok'); }
+    else if(added){ toast(`${added} file baru masuk otomatis`, 'ok'); }
+  }catch(e){
+    if(!silent) toast('Gagal sinkron: ' + e.message, 'err');
+    logActivity(`Sync failed: ${e.message}`, 'err');
+  }finally{
+    if(!silent) $('#refreshBtn').disabled = false;
+    syncInFlight = false;
+  }
+}
+
+let syncInFlight = false;
+let autoSyncTimer = null;
+let autoSyncTickCount = 0;
+const AUTO_SYNC_MS = 5000;
+const PULL_EVERY_N_TICKS = 4; // pull index cloud tiap ~20 detik (5s x 4) saat auto-sync, bukan tiap 5 detik
+function startAutoSync(){
+  stopAutoSync();
+  if(!CONFIG) return;
+  autoSyncTimer = setInterval(() => { if(document.visibilityState === 'visible') syncInbox(true); }, AUTO_SYNC_MS);
+}
+function stopAutoSync(){ if(autoSyncTimer){ clearInterval(autoSyncTimer); autoSyncTimer = null; } }
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && CONFIG) syncInbox(true); });
+
+// ============ Init & Events ============
+function bindEvents(){
+  $('#addFolderBtn').addEventListener('click', () => createFolder(null));
+  $('#settingsBtn').addEventListener('click', showSetupModal);
+  $('#aboutBtn').addEventListener('click', () => toast('Haris DevLab-NAS v1.0 — private cloud storage', 'ok'));
+  $('#refreshBtn').addEventListener('click', () => syncInbox(false));
+  $('#uploadFileBtn').addEventListener('click', () => $('#fileInput').click());
+  $('#uploadFolderBtn').addEventListener('click', () => $('#folderInput').click());
+  $('#fileInput').addEventListener('change', (e) => { handleUploadFiles(e.target.files); e.target.value=''; });
+  $('#folderInput').addEventListener('change', (e) => { handleUploadFolder(e.target.files); e.target.value=''; });
+  $('#searchInput').addEventListener('input', renderTable);
+  $$('.nav-item[data-view]').forEach(el => el.addEventListener('click', () => setView(el.dataset.view)));
+
+  $('#downloadBtn').addEventListener('click', downloadSelected);
+  $('#deleteBtn').addEventListener('click', deleteSelected);
+  $('#renameBtn').addEventListener('click', renameSelected);
+  $('#moveBtn').addEventListener('click', showMoveModal);
+  $('#copyBtn').addEventListener('click', copySelected);
+  $('#favBtn').addEventListener('click', toggleFavoriteSelected);
+  $('#propsBtn').addEventListener('click', showPropertiesModal);
+
+  $('#filterSelect').addEventListener('change', (e) => { filterKind = e.target.value; renderTable(); });
+  $('#sortSelect').addEventListener('change', (e) => { sortKey = e.target.value; renderTable(); });
+  $('#sortDirBtn').addEventListener('click', () => {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    $('#sortDirBtn').textContent = sortDir.toUpperCase();
+    renderTable();
+  });
+  $$('thead th[data-sort]').forEach(th => th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if(sortKey === key){ sortDir = sortDir === 'asc' ? 'desc' : 'asc'; } else { sortKey = key; sortDir = 'asc'; }
+    $('#sortSelect').value = sortKey;
+    $('#sortDirBtn').textContent = sortDir.toUpperCase();
+    $$('thead th').forEach(t => t.classList.remove('active-sort'));
+    th.classList.add('active-sort');
+    renderTable();
+  }));
+
+  $('#pageSizeRow').addEventListener('click', (e) => {
+    const btn = e.target.closest('.pill');
+    if(!btn) return;
+    pageSize = parseInt(btn.dataset.size, 10);
+    savePageSize();
+    $$('#pageSizeRow .pill').forEach(p => p.classList.toggle('active', p === btn));
+  });
+  $('#themeRow').addEventListener('click', (e) => {
+    const btn = e.target.closest('.pill');
+    if(!btn) return;
+    theme = btn.dataset.theme;
+    saveTheme();
+    applyTheme();
+    $$('#themeRow .pill').forEach(p => p.classList.toggle('active', p === btn));
+    toast('Tema diganti ke "' + btn.textContent + '"', 'ok');
+  });
+
+  $('#clearLogBtn').addEventListener('click', () => { LOG = []; renderLog(); });
+  $('#toggleLogBtn').addEventListener('click', () => {
+    const panel = $('#activityPanel');
+    panel.classList.toggle('collapsed');
+    $('#toggleLogBtn').textContent = panel.classList.contains('collapsed') ? 'Expand' : 'Collapse';
+  });
+
+
+
+  document.body.addEventListener('dragover', (e)=> e.preventDefault());
+  document.body.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if(e.dataTransfer.files.length) handleUploadFiles(e.dataTransfer.files);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape') clearSelection();
+    if(e.key === 'Delete' && SELECTED.size) deleteSelected();
+  });
+}
+
+async function init(){
+  logActivity('Auto login...', 'info');
+  await loadAll();
+  applyTheme();
+  $$('#themeRow .pill').forEach(p => p.classList.toggle('active', p.dataset.theme === theme));
+  $$('#pageSizeRow .pill').forEach(p => p.classList.toggle('active', parseInt(p.dataset.size,10) === pageSize));
+  if(window.matchMedia){
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+      if(theme === 'system') applyTheme();
+    });
+  }
+  bindEvents();
+  updateStatusUI();
+  if(CONFIG){
+    logActivity('Menarik data terbaru dari cloud...', 'info');
+    const pulled = await pullIndexFromCloud();
+    if(!pulled && sb && (FOLDERS.length || FILES.length)){
+      logActivity('Mengisi Cloud dengan data lokal yang sudah ada...', 'info');
+      await pushIndexToCloud();
+    }
+  }
+  renderFolders();
+  renderTable();
+  if(!CONFIG){
+    logActivity('Session expired, please login again', 'warn');
+    setTimeout(showSetupModal, 300);
+  } else {
+    logActivity(`Bot terhubung`, 'ok');
+    syncInbox();
+    startAutoSync();
+  }
+}
+
+init();
+</script>
+</body>
+</html>
