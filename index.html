@@ -813,6 +813,9 @@ async function fetchTextCrossOrigin(url){
 // Mengembalikan true kalau berhasil menerapkan data baru.
 async function pullIndexFromCloud(){
   if(!CONFIG) return false;
+  // Jangan pull kalau ada push yang lagi diproses/dijadwalkan — kalau dipaksa, data cloud
+  // yang belum ke-update bisa nimpa balik perubahan lokal yang baru aja dibuat (race condition).
+  if(indexPushInFlight || indexPushTimer){ return false; }
   try{
     if(sb){
       const { data, error } = await sb.from('td_index').select('data, updated_at').eq('chat_id', CONFIG.chatId).maybeSingle();
