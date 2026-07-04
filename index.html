@@ -706,6 +706,11 @@ async function tgUpload(file){
 const INDEX_FILENAME = '.tgdrive-index.json';
 let indexPushTimer = null;
 let indexPushInFlight = false;
+// Naik ke true selama ada operasi batch lokal (upload banyak file, dll) yang masih
+// berjalan dan belum disimpan. Selama true, pull dari cloud (polling maupun realtime)
+// DILARANG jalan — soalnya kalau nyempil, dia bisa nimpa array FILES/FOLDERS di memori
+// yang isinya progres upload yang belum sempat ke-save, bikin sebagian file "hilang".
+let bulkOpInProgress = false;
 
 function scheduleIndexPush(){
   if(!CONFIG) return;
@@ -815,7 +820,7 @@ async function pullIndexFromCloud(){
   if(!CONFIG) return false;
   // Jangan pull kalau ada push yang lagi diproses/dijadwalkan — kalau dipaksa, data cloud
   // yang belum ke-update bisa nimpa balik perubahan lokal yang baru aja dibuat (race condition).
-  if(indexPushInFlight || indexPushTimer){ return false; }
+  if(indexPushInFlight || indexPushTimer || bulkOpInProgress){ return false; }
   try{
     if(sb){
       const { data, error } = await sb.from('td_index').select('data, updated_at').eq('chat_id', CONFIG.chatId).maybeSingle();
@@ -865,6 +870,8 @@ function subscribeRealtime(){
       (payload) => {
         // Abaikan echo dari push sendiri (barusan kita yang nulis)
         if(Date.now() - lastPushedAt < 3000) return;
+        // Abaikan kalau lagi ada operasi lokal (misal upload) yang belum kelar disimpan
+        if(bulkOpInProgress || indexPushInFlight || indexPushTimer) return;
         if(payload.new && payload.new.data){
           applyCloudIndex(payload.new.data);
           logActivity('Update realtime dari device lain diterapkan', 'ok');
@@ -1602,30 +1609,35 @@ async function handleUploadFiles(fileList){
   if(!CONFIG){ showSetupModal(); return; }
   const files = Array.from(fileList);
   let done = 0;
+  bulkOpInProgress = true;
   const manualFolderId = (currentView !== 'all' && currentView !== 'inbox' && currentView !== 'favorites' && currentView !== 'trash') ? currentView : null;
-  for(const file of files){
-    try{
-      setProgress(10 + (done/files.length)*80);
-      logActivity(`Upload started: ${file.name}`, 'info');
-      const result = await tgUpload(file);
-      const doc = result.document;
-      const fname = doc.file_name || file.name;
-      let folderId = manualFolderId;
-      if(!folderId){
-        const category = getExtCategory(fname);
-        if(category) folderId = await ensureFolderByName(category, null);
+  try{
+    for(const file of files){
+      try{
+        setProgress(10 + (done/files.length)*80);
+        logActivity(`Upload started: ${file.name}`, 'info');
+        const result = await tgUpload(file);
+        const doc = result.document;
+        const fname = doc.file_name || file.name;
+        let folderId = manualFolderId;
+        if(!folderId){
+          const category = getExtCategory(fname);
+          if(category) folderId = await ensureFolderByName(category, null);
+        }
+        FILES.push({
+          id: uid(), name: fname, folderId, tgFileId: doc.file_id, tgMessageId: result.message_id,
+          size: doc.file_size || file.size, mime: doc.mime_type || file.type, kind: kindFromMime(doc.mime_type || file.type),
+          ts: Date.now(), favorite: false, trashed: false
+        });
+        done++;
+        logActivity(`Upload completed: ${fname}`, 'ok');
+      }catch(e){
+        toast(`Gagal unggah ${file.name}: ${e.message}`, 'err');
+        logActivity(`Upload failed: ${file.name} — ${e.message}`, 'err');
       }
-      FILES.push({
-        id: uid(), name: fname, folderId, tgFileId: doc.file_id, tgMessageId: result.message_id,
-        size: doc.file_size || file.size, mime: doc.mime_type || file.type, kind: kindFromMime(doc.mime_type || file.type),
-        ts: Date.now(), favorite: false, trashed: false
-      });
-      done++;
-      logActivity(`Upload completed: ${fname}`, 'ok');
-    }catch(e){
-      toast(`Gagal unggah ${file.name}: ${e.message}`, 'err');
-      logActivity(`Upload failed: ${file.name} — ${e.message}`, 'err');
     }
+  } finally {
+    bulkOpInProgress = false;
   }
   await saveFiles();
   setProgress(100);
@@ -1639,28 +1651,33 @@ async function handleUploadFolder(fileList){
   const files = Array.from(fileList);
   if(!files.length) return;
   let done = 0;
+  bulkOpInProgress = true;
   const manualFolderId = (currentView !== 'all' && currentView !== 'inbox' && currentView !== 'favorites' && currentView !== 'trash') ? currentView : null;
-  for(const file of files){
-    try{
-      setProgress(10 + (done/files.length)*80);
-      const rel = file.webkitRelativePath || file.name;
-      const segments = rel.split('/'); segments.pop(); // buang nama file, sisakan path folder
-      const folderId = await ensurePathFolders(segments, manualFolderId);
-      logActivity(`Upload started: ${rel}`, 'info');
-      const result = await tgUpload(file);
-      const doc = result.document;
-      const fname = doc.file_name || file.name;
-      FILES.push({
-        id: uid(), name: fname, folderId, tgFileId: doc.file_id, tgMessageId: result.message_id,
-        size: doc.file_size || file.size, mime: doc.mime_type || file.type, kind: kindFromMime(doc.mime_type || file.type),
-        ts: Date.now(), favorite: false, trashed: false
-      });
-      done++;
-      logActivity(`Upload completed: ${fname}`, 'ok');
-    }catch(e){
-      toast(`Gagal unggah ${file.name}: ${e.message}`, 'err');
-      logActivity(`Upload failed: ${file.name} — ${e.message}`, 'err');
+  try{
+    for(const file of files){
+      try{
+        setProgress(10 + (done/files.length)*80);
+        const rel = file.webkitRelativePath || file.name;
+        const segments = rel.split('/'); segments.pop(); // buang nama file, sisakan path folder
+        const folderId = await ensurePathFolders(segments, manualFolderId);
+        logActivity(`Upload started: ${rel}`, 'info');
+        const result = await tgUpload(file);
+        const doc = result.document;
+        const fname = doc.file_name || file.name;
+        FILES.push({
+          id: uid(), name: fname, folderId, tgFileId: doc.file_id, tgMessageId: result.message_id,
+          size: doc.file_size || file.size, mime: doc.mime_type || file.type, kind: kindFromMime(doc.mime_type || file.type),
+          ts: Date.now(), favorite: false, trashed: false
+        });
+        done++;
+        logActivity(`Upload completed: ${fname}`, 'ok');
+      }catch(e){
+        toast(`Gagal unggah ${file.name}: ${e.message}`, 'err');
+        logActivity(`Upload failed: ${file.name} — ${e.message}`, 'err');
+      }
     }
+  } finally {
+    bulkOpInProgress = false;
   }
   await saveFiles();
   setProgress(100);
