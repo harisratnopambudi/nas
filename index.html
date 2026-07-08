@@ -520,6 +520,11 @@ let sortDir = 'asc';
 let filterKind = 'all';
 let pageSize = 50;
 let theme = 'dark'; // 'light' | 'dark' | 'system'
+// Timestamp (ms epoch) dari versi cloud terakhir yang KITA TAHU sudah diterapkan
+// ke state lokal (baik lewat pull maupun push kita sendiri). Dipakai untuk
+// mendeteksi apakah cloud sudah berubah oleh device lain sejak terakhir kita tahu,
+// supaya kita tidak menimpanya dengan state lokal yang stale (race condition).
+let lastKnownCloudUpdatedAt = 0;
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -604,6 +609,7 @@ async function loadAll(){
   updateOffset = (await storeGet('td:offset')) || 0;
   pageSize = (await storeGet('td:pagesize')) || 50;
   theme = (await storeGet('td:theme')) || 'dark';
+  lastKnownCloudUpdatedAt = (await storeGet('td:lastCloudTs')) || 0;
 
   // File ini punya bot & chat ID bawaan (tertanam di kode). Supaya SEMUA device/browser
   // yang buka file yang sama pasti nyambung ke chat Telegram yang SAMA (dan filenya kelihatan
@@ -650,6 +656,7 @@ async function saveFiles(){ await storeSet('td:files', FILES); scheduleIndexPush
 async function saveOffset(){ await storeSet('td:offset', updateOffset); }
 async function savePageSize(){ await storeSet('td:pagesize', pageSize); }
 async function saveTheme(){ await storeSet('td:theme', theme); }
+async function saveLastKnownCloudTs(){ await storeSet('td:lastCloudTs', lastKnownCloudUpdatedAt); }
 
 // ============ Telegram API ============
 function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
@@ -737,18 +744,49 @@ function scheduleIndexPush(){
 
 let lastPushedAt = 0;
 
+// PENTING: sebelum menimpa index cloud dengan state lokal, kita cek dulu apakah
+// versi di cloud sudah lebih baru dari versi terakhir yang kita tahu (lastKnownCloudUpdatedAt).
+// Kalau iya, berarti ADA perubahan dari device lain yang belum kita tarik — kita pull &
+// gabungkan (cloud menang) dulu sebelum push, supaya delete/perubahan dari device lain
+// tidak ketimpa balik oleh state lokal yang stale (ini akar masalah "delete balik lagi").
 async function pushIndexToCloud(){
   if(!CONFIG || indexPushInFlight) return;
   indexPushInFlight = true;
   try{
     if(sb){
+      // 1) Cek dulu versi cloud saat ini
+      const { data: current, error: readErr } = await sb.from('td_index')
+        .select('updated_at')
+        .eq('chat_id', CONFIG.chatId)
+        .maybeSingle();
+      if(readErr) throw new Error(readErr.message);
+
+      if(current && current.updated_at){
+        const cloudTs = new Date(current.updated_at).getTime();
+        // Cloud sudah berubah oleh device lain sejak terakhir kali kita tahu -> jangan
+        // langsung timpa. Tarik dulu perubahan itu supaya tidak hilang.
+        if(cloudTs > lastKnownCloudUpdatedAt){
+          logActivity('Cloud sudah berubah dari device lain, menarik dulu sebelum menyimpan...', 'warn');
+          await pullIndexFromCloud(true /* force, abaikan guard bulkOp */);
+          // Setelah pull, FOLDERS/FILES di memori sudah jadi versi cloud terbaru.
+          // Batalkan push kali ini — perubahan lokal yang belum sempat masuk ke versi
+          // itu (jika ada) akan ter-trigger ulang lewat scheduleIndexPush oleh save berikutnya.
+          // Ini mencegah kita menimpa balik perubahan device lain (misal: delete) dengan
+          // data lokal yang stale.
+          indexPushInFlight = false;
+          return;
+        }
+      }
+
       lastPushedAt = Date.now();
-      const { error } = await sb.from('td_index').upsert({
+      const { data: upserted, error } = await sb.from('td_index').upsert({
         chat_id: CONFIG.chatId,
         data: { folders: FOLDERS, files: FILES },
         updated_at: new Date(lastPushedAt).toISOString()
-      });
+      }).select('updated_at').single();
       if(error) throw new Error(error.message);
+      lastKnownCloudUpdatedAt = upserted ? new Date(upserted.updated_at).getTime() : lastPushedAt;
+      await saveLastKnownCloudTs();
       logActivity('Metadata disinkron ke Cloud', 'ok');
       return;
     }
@@ -830,17 +868,23 @@ async function fetchTextCrossOrigin(url){
 
 // Ambil index terbaru dari Supabase (atau fallback pesan yang di-pin di Telegram).
 // Mengembalikan true kalau berhasil menerapkan data baru.
-async function pullIndexFromCloud(){
+// `force` = true dipakai secara internal oleh pushIndexToCloud untuk melewati guard
+// bulkOpInProgress/indexPushTimer (karena saat itu kita SENGAJA mau menarik versi
+// cloud terbaru sebelum menimpanya).
+async function pullIndexFromCloud(force){
   if(!CONFIG) return false;
   // Jangan pull kalau ada push yang lagi diproses/dijadwalkan — kalau dipaksa, data cloud
   // yang belum ke-update bisa nimpa balik perubahan lokal yang baru aja dibuat (race condition).
-  if(indexPushInFlight || indexPushTimer || bulkOpInProgress){ return false; }
+  if(!force && (indexPushInFlight || indexPushTimer || bulkOpInProgress)){ return false; }
   try{
     if(sb){
       const { data, error } = await sb.from('td_index').select('data, updated_at').eq('chat_id', CONFIG.chatId).maybeSingle();
       if(error) throw new Error(error.message);
       if(!data){ logActivity('Belum ada metadata di Cloud.', 'warn'); return false; }
+      const cloudTs = data.updated_at ? new Date(data.updated_at).getTime() : Date.now();
       applyCloudIndex(data.data);
+      lastKnownCloudUpdatedAt = cloudTs;
+      await saveLastKnownCloudTs();
       logActivity('Metadata tersinkron dari Cloud', 'ok');
       return true;
     }
@@ -888,6 +932,10 @@ function subscribeRealtime(){
         if(bulkOpInProgress || indexPushInFlight || indexPushTimer) return;
         if(payload.new && payload.new.data){
           applyCloudIndex(payload.new.data);
+          if(payload.new.updated_at){
+            lastKnownCloudUpdatedAt = new Date(payload.new.updated_at).getTime();
+            saveLastKnownCloudTs();
+          }
           logActivity('Update realtime dari device lain diterapkan', 'ok');
         }
       }
